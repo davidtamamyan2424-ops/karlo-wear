@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import path from "node:path";
+import type { NextFunction, Request, Response } from "express";
 import multer from "multer";
 import {
   ALLOWED_IMAGE_EXT,
@@ -19,9 +20,11 @@ const storage = multer.diskStorage({
   },
 });
 
+const RECEIPT_MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 МБ
+
 export const uploadReceipt = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 МБ
+  limits: { fileSize: RECEIPT_MAX_FILE_SIZE },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     const mimeOk = (ALLOWED_PROOF_MIME as readonly string[]).includes(file.mimetype);
@@ -33,6 +36,17 @@ export const uploadReceipt = multer({
     }
   },
 });
+
+/** Middleware загрузки чека с понятной ошибкой при превышении лимита. */
+export function handleReceiptUpload(req: Request, res: Response, next: NextFunction): void {
+  uploadReceipt.single("receipt")(req, res, (err) => {
+    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+      next(badRequest("Файл слишком большой. Максимальный размер — 20 МБ."));
+      return;
+    }
+    next(err);
+  });
+}
 
 function imageFileFilter(
   _req: Express.Request,

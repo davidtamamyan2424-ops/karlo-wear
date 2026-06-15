@@ -2,7 +2,7 @@ import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { badRequest } from "../lib/errors.js";
 import { createOrderSchema } from "../validation.js";
-import { uploadReceipt } from "../lib/upload.js";
+import { handleReceiptUpload } from "../lib/upload.js";
 import { UPLOADS_URL_PREFIX } from "../lib/uploads.js";
 import { attachPaymentProof, createOrder, getOrderById } from "../services/orders.js";
 
@@ -29,7 +29,7 @@ ordersRouter.get(
 // Загрузка чека об оплате
 ordersRouter.post(
   "/:id/payment-proof",
-  uploadReceipt.single("receipt"),
+  handleReceiptUpload,
   asyncHandler(async (req, res) => {
     if (!req.file) throw badRequest("Файл чека не загружен");
     const fileUrl = `${UPLOADS_URL_PREFIX}/${req.file.filename}`;
