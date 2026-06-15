@@ -1,0 +1,136 @@
+import { z } from "zod";
+import { SIZES, ORDER_STATUSES, PRODUCT_BADGES, DELIVERY_METHODS } from "./constants.js";
+import { normalizeRuPhone } from "./lib/phone.js";
+
+export const createOrderSchema = z
+  .object({
+    customerName: z.string().trim().min(1, "Укажите имя"),
+    phone: z
+      .string()
+      .trim()
+      .transform((val, ctx) => {
+        const normalized = normalizeRuPhone(val);
+        if (!normalized) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Укажите номер телефона",
+          });
+          return z.NEVER;
+        }
+        return normalized;
+      }),
+    city: z.string().trim().min(1, "Укажите город"),
+    comment: z.string().trim().max(1000).optional().nullable(),
+    telegramUser: z
+      .string()
+      .trim()
+      .transform((s) => s.replace(/^@/, ""))
+      .pipe(
+        z
+          .string()
+          .min(1, "Для оформления заказа необходимо указать Telegram username.")
+          .max(64),
+      ),
+    telegramId: z.string().trim().max(64).optional().nullable(),
+    // Доставка
+    deliveryMethod: z.enum(DELIVERY_METHODS, {
+      errorMap: () => ({ message: "Выберите способ доставки" }),
+    }),
+    deliveryAddress: z.string().trim().max(500).optional().nullable(),
+    deliveryComment: z.string().trim().max(1000).optional().nullable(),
+    deliveryConfirmed: z.boolean(),
+    items: z
+      .array(
+        z.object({
+          productId: z.string().min(1),
+          sizeLabel: z.enum(SIZES),
+          quantity: z.number().int().min(1).max(99),
+        }),
+      )
+      .min(1, "Добавьте товары в корзину"),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.deliveryConfirmed) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["deliveryConfirmed"],
+        message: "Подтвердите условия доставки",
+      });
+    }
+    if (data.deliveryMethod === "WILDBERRIES" || data.deliveryMethod === "OZON") {
+      if (!data.deliveryAddress || data.deliveryAddress.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["deliveryAddress"],
+          message: "Укажите адрес пункта выдачи",
+        });
+      }
+    }
+    if (data.deliveryMethod === "OTHER") {
+      if (!data.deliveryComment || data.deliveryComment.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["deliveryComment"],
+          message: "Укажите предпочтительный способ доставки",
+        });
+      }
+    }
+  });
+
+export type CreateOrderBody = z.infer<typeof createOrderSchema>;
+
+export const paymentAccountSchema = z.object({
+  bankName: z.string().trim().min(1, "Укажите банк"),
+  recipientName: z.string().trim().min(1, "Укажите получателя"),
+  phoneNumber: z.string().trim().min(1, "Укажите номер телефона"),
+  isActive: z.boolean().optional(),
+});
+
+export const paymentAccountUpdateSchema = paymentAccountSchema.partial();
+
+export const orderStatusSchema = z.object({
+  status: z.enum(ORDER_STATUSES),
+});
+
+// --- Управление товарами (админка) ---
+
+const sizeStockSchema = z.object({
+  label: z.enum(SIZES),
+  stock: z.number().int("Остаток должен быть целым числом").min(0, "Остаток не может быть отрицательным"),
+});
+
+const productImagesSchema = z
+  .array(z.string().trim().min(1).max(1000))
+  .max(20, "Слишком много изображений");
+
+export const createProductSchema = z.object({
+  name: z.string().trim().min(1, "Укажите название"),
+  sku: z.string().trim().min(1, "Укажите артикул").max(64),
+  description: z.string().trim().max(4000).optional().nullable(),
+  // Цена в копейках (minor units)
+  price: z.number().int("Цена должна быть целым числом").min(1, "Укажите цену"),
+  composition: z.string().trim().max(200).optional().nullable(),
+  fabricDensity: z.string().trim().max(100).optional().nullable(),
+  modelHeight: z.number().int().min(0).max(300).optional().nullable(),
+  modelSize: z.enum(SIZES).optional().nullable(),
+  badge: z.enum(PRODUCT_BADGES).optional().nullable(),
+  images: productImagesSchema.optional(),
+  isActive: z.boolean().optional(),
+  sizes: z.array(sizeStockSchema).max(SIZES.length).optional(),
+});
+
+export type CreateProductBody = z.infer<typeof createProductSchema>;
+
+export const updateProductSchema = createProductSchema.partial();
+export type UpdateProductBody = z.infer<typeof updateProductSchema>;
+
+// Изменение остатка: delta (может быть отрицательной для прямого вычитания).
+export const stockAdjustSchema = z.object({
+  label: z.enum(SIZES),
+  delta: z.number().int("Значение должно быть целым числом"),
+});
+
+// Ручная сортировка товаров: массив id в желаемом порядке.
+export const reorderProductsSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1, "Передайте порядок товаров"),
+});

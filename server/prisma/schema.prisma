@@ -1,0 +1,119 @@
+// Prisma schema for Karlo Wear
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id          String        @id @default(cuid())
+  sku         String        @unique // Артикул
+  name        String
+  description String?
+  price       Int // в копейках (minor units)
+  currency    String        @default("RUB")
+  imageUrl    String? // основное изображение (обложка)
+  imagesJson  String? // JSON-массив URL изображений для галереи
+  category    String?
+  // Бейдж витрины: NEW | BESTSELLER | LIMITED (необязательно)
+  badge       String?
+  // Характеристики
+  composition   String? // Состав, напр. «100% хлопок»
+  fabricDensity String? // Плотность ткани, напр. «240 г/м²»
+  // Параметры модели на фото
+  modelHeight Int? // Рост модели, см
+  modelSize   String? // Размер на модели: S | M | L | XL
+  isActive    Boolean       @default(true)
+  // Позиция в каталоге (управляется администратором, сортировка по возрастанию).
+  position    Int           @default(0)
+  sizes       ProductSize[]
+  orderItems  OrderItem[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model ProductSize {
+  id        String      @id @default(cuid())
+  product   Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+  label     String // только S | M | L | XL
+  stock     Int         @default(0) // остаток по размеру
+  orderItems OrderItem[]
+
+  @@unique([productId, label])
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  orderNumber   Int         @unique // человекочитаемый номер заказа (Заказ №XXX)
+  // Telegram identity of the buyer
+  telegramId    String?
+  telegramUser  String? // Telegram username
+  // Checkout form fields
+  customerName  String // Имя
+  phone         String // Телефон
+  city          String // Город
+  comment       String? // Комментарий к заказу
+  // Статус заказа (см. ORDER_STATUSES в src/constants.ts; SQLite не поддерживает enum).
+  status        String      @default("AWAITING_PAYMENT")
+  totalAmount   Int
+  currency      String      @default("RUB")
+  // Назначенный банк — фиксируется при создании заказа и больше не меняется.
+  paymentAccount   PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
+  paymentAccountId String?
+  assignedBankName      String?
+  assignedRecipientName String?
+  assignedPhoneNumber   String?
+  // Доставка (стоимость рассчитывается вручную после оформления, не на чекауте).
+  deliveryMethod    String? // WILDBERRIES | OZON | OTHER
+  deliveryAddress   String? // Адрес пункта выдачи / адрес доставки
+  deliveryComment   String? // Номер ПВЗ или предпочтительный способ (для «Другое»)
+  deliveryConfirmed Boolean @default(false) // Покупатель подтвердил уведомление о доставке
+  // Срок, до которого заказ должен быть оплачен (иначе авто-отмена).
+  paymentDueAt  DateTime?
+  // Был ли восстановлен резерв склада (защита от повторного восстановления).
+  stockRestored Boolean     @default(false)
+  items         OrderItem[]
+  paymentProofs PaymentProof[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model PaymentAccount {
+  id            String   @id @default(cuid())
+  bankName      String
+  recipientName String
+  phoneNumber   String
+  isActive      Boolean  @default(true)
+  orders        Order[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model PaymentProof {
+  id         String   @id @default(cuid())
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId    String
+  fileUrl    String
+  uploadedAt DateTime @default(now())
+}
+
+model OrderItem {
+  id            String       @id @default(cuid())
+  order         Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId       String
+  product       Product      @relation(fields: [productId], references: [id])
+  productId     String
+  productSize   ProductSize? @relation(fields: [productSizeId], references: [id])
+  productSizeId String?
+  // snapshot of product details at purchase time
+  productName   String
+  sizeLabel     String?
+  unitPrice     Int
+  quantity      Int          @default(1)
+}

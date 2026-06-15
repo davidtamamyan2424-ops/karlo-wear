@@ -1,0 +1,196 @@
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { fetchProduct } from "../api/endpoints";
+import type { Product } from "../types";
+import type { Size } from "../constants";
+import { ru } from "../i18n/ru";
+import { formatPrice, formatHeight } from "../lib/format";
+import { useCart } from "../cart/CartContext";
+import { useToast } from "../components/Toast";
+import { hapticImpact, hapticNotify, hapticSelection } from "../telegram/webapp";
+import ImageGallery from "../components/ImageGallery";
+
+export default function ProductPage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { addItem } = useCart();
+  const { show } = useToast();
+
+  const [product, setProduct] = useState<Product | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedSize, setSelectedSize] = useState<Size | null>(null);
+  const [addedSize, setAddedSize] = useState<Size | null>(null);
+  const [flash, setFlash] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    setProduct(null);
+    fetchProduct(id)
+      .then(setProduct)
+      .catch(() => setError(ru.common.error));
+  }, [id]);
+
+  if (error) {
+    return <p className="py-10 text-center text-sm text-red-600">{error}</p>;
+  }
+  if (!product) {
+    return (
+      <div className="animate-fade-in">
+        <div className="aspect-[3/4] w-full animate-pulse rounded-card bg-surface" />
+        <div className="mt-4 h-5 w-2/3 animate-pulse rounded bg-surface" />
+        <div className="mt-3 h-4 w-1/3 animate-pulse rounded bg-surface" />
+      </div>
+    );
+  }
+
+  const selectedStock = selectedSize
+    ? (product.sizes.find((s) => s.label === selectedSize)?.stock ?? 0)
+    : null;
+
+  const inCart = addedSize !== null && addedSize === selectedSize;
+
+  const handleAdd = () => {
+    if (inCart) {
+      navigate("/cart");
+      return;
+    }
+    if (!selectedSize) return;
+    const ok = addItem(product, selectedSize);
+    if (ok) {
+      hapticImpact("medium");
+      show(ru.notifications.addedToCart, "success");
+      setAddedSize(selectedSize);
+      setFlash(true);
+      window.setTimeout(() => setFlash(false), 900);
+    } else {
+      hapticNotify("warning");
+      show(ru.cart.maxStockReached, "info");
+    }
+  };
+
+  const detailRow = (label: string, value: string) => (
+    <div className="flex justify-between gap-4 py-2.5">
+      <span className="text-muted">{label}</span>
+      <span className="text-right font-medium text-ink">{value}</span>
+    </div>
+  );
+
+  return (
+    <div className="animate-fade-in space-y-5">
+      <ImageGallery
+        images={product.images}
+        alt={product.name}
+        aspect="3/4"
+        eagerFirst
+      />
+
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-ink">{product.name}</h1>
+        <p className="mt-1.5 text-2xl font-semibold text-ink">{formatPrice(product.price)}</p>
+      </div>
+
+      {/* Выбор размера */}
+      <div>
+        <div className="mb-2 flex items-baseline justify-between">
+          <p className="text-sm font-medium text-ink">{ru.product.size}</p>
+          {selectedStock != null && selectedStock > 0 && (
+            <span className="text-xs text-muted">
+              {ru.product.inStock} · {selectedStock} {ru.product.pieces}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {product.sizes.map((s) => {
+            const disabled = s.stock <= 0;
+            const active = selectedSize === s.label;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                disabled={disabled}
+                onClick={() => {
+                  hapticSelection();
+                  setSelectedSize(s.label);
+                }}
+                className={[
+                  "press flex h-12 min-w-12 items-center justify-center rounded-button px-4 text-sm font-medium",
+                  disabled
+                    ? "cursor-not-allowed text-muted/60 line-through ring-1 ring-inset ring-line"
+                    : active
+                      ? "bg-ink text-white"
+                      : "bg-surface text-ink hover:bg-line",
+                ].join(" ")}
+              >
+                {s.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {product.description && (
+        <div>
+          <h2 className="mb-1.5 text-sm font-semibold text-ink">{ru.product.description}</h2>
+          <p className="text-sm leading-relaxed text-muted">{product.description}</p>
+        </div>
+      )}
+
+      {/* Характеристики */}
+      <div>
+        <h2 className="mb-1 text-sm font-semibold text-ink">{ru.product.details}</h2>
+        <div className="divide-y divide-line text-sm">
+          {product.composition && detailRow(ru.product.composition, product.composition)}
+          {product.fabricDensity &&
+            detailRow(ru.product.fabricDensity, product.fabricDensity)}
+          {product.modelHeight != null &&
+            detailRow(ru.product.modelHeight, formatHeight(product.modelHeight))}
+          {product.modelSize && detailRow(ru.product.modelSize, product.modelSize)}
+          {detailRow(ru.product.sku, product.sku)}
+        </div>
+      </div>
+
+      {/* Док-панель действий */}
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-paper/95 px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 backdrop-blur">
+        <div className="mx-auto flex max-w-2xl gap-2.5">
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={!selectedSize}
+            className={[
+              "press flex h-12 flex-1 items-center justify-center gap-2 rounded-button text-[15px] font-semibold",
+              !selectedSize
+                ? "cursor-not-allowed bg-surface text-muted"
+                : flash
+                  ? "bg-emerald-600 text-white"
+                  : "bg-ink text-white shadow-soft",
+            ].join(" ")}
+          >
+            {flash ? (
+              <>
+                <svg className="animate-check-pop" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+                {ru.product.added}
+              </>
+            ) : inCart ? (
+              ru.product.goToCart
+            ) : selectedSize ? (
+              ru.product.addToCart
+            ) : (
+              ru.product.selectSize
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/cart")}
+            className="press flex h-12 items-center justify-center rounded-button bg-surface px-5 text-[15px] font-medium text-ink"
+          >
+            {ru.nav.cart}
+          </button>
+        </div>
+      </div>
+
+      <div className="h-16" />
+    </div>
+  );
+}
