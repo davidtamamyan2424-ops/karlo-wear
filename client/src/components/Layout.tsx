@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { ru } from "../i18n/ru";
 import { useCart } from "../cart/CartContext";
+import Footer from "./Footer";
 
 export default function Layout() {
   const { count } = useCart();
@@ -47,6 +48,8 @@ export default function Layout() {
       >
         <Outlet />
       </main>
+
+      {!isAdmin && <Footer />}
     </div>
   );
 }

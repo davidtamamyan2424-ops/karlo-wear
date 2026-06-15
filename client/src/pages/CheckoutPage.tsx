@@ -8,6 +8,7 @@ import { createOrder } from "../api/endpoints";
 import { getTelegramUser, hapticSelection } from "../telegram/webapp";
 import { ApiError } from "../api/client";
 import PhoneInput from "../components/PhoneInput";
+import LegalConsentCheckbox from "../components/LegalConsentCheckbox";
 import {
   DELIVERY_METHODS,
   DELIVERY_METHOD_LABELS,
@@ -30,6 +31,7 @@ export default function CheckoutPage() {
   const [pickupNumber, setPickupNumber] = useState("");
   const [otherText, setOtherText] = useState("");
   const [deliveryAck, setDeliveryAck] = useState(false);
+  const [legalConsent, setLegalConsent] = useState(false);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -64,6 +66,7 @@ export default function CheckoutPage() {
       if (!otherText.trim()) next.deliveryComment = ru.validation.deliveryOtherRequired;
     }
     if (!deliveryAck) next.deliveryAck = ru.validation.deliveryNotConfirmed;
+    if (!legalConsent) next.legal = ru.validation.legalNotConfirmed;
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -290,6 +293,17 @@ export default function CheckoutPage() {
         )}
       </section>
 
+      <section className="rounded-card bg-surface p-4">
+        <LegalConsentCheckbox
+          checked={legalConsent}
+          onChange={(checked) => {
+            setLegalConsent(checked);
+            if (checked) setErrors((prev) => ({ ...prev, legal: "" }));
+          }}
+          error={errors.legal}
+        />
+      </section>
+
       <div className="rounded-card bg-surface p-4">
         <div className="flex justify-between text-base font-semibold text-ink">
           <span>{ru.cart.total}</span>
@@ -302,7 +316,7 @@ export default function CheckoutPage() {
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-paper/95 px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 backdrop-blur">
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || !legalConsent}
           className="press mx-auto block w-full max-w-2xl rounded-button bg-ink py-3.5 text-[15px] font-semibold text-white shadow-soft disabled:opacity-60"
         >
           {submitting ? ru.checkout.submitting : ru.checkout.submit}
