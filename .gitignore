@@ -39,3 +39,11 @@ Thumbs.db
 # Misc
 *.tsbuildinfo
 coverage/
+
+# Cursor / Claude
+.cursor/
+.claude/
+
+# Local databases
+*.db
+*.db-journal
