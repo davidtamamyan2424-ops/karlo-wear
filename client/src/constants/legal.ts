@@ -1,7 +1,7 @@
 /** Реквизиты продавца для юридических страниц. */
 export const LEGAL = {
   brand: "KARLO WEAR",
-  seller: "Тамамян Д.Б.",
+  seller: "Тамамян М.С.",
   sellerStatus: "Плательщик налога на профессиональный доход (самозанятый)",
   city: "г. Москва",
   email: "david.tamamyan2424@gmail.com",
