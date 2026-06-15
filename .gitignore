@@ -13,11 +13,13 @@ out/
 .env.local
 .env.*.local
 
-# Prisma / SQLite
+# Prisma (legacy SQLite local files)
 server/prisma/*.db
 server/prisma/*.db-journal
 *.sqlite
 *.sqlite3
+*.db
+*.db-journal
 
 # Uploaded payment receipts
 server/uploads/
@@ -43,7 +45,3 @@ coverage/
 # Cursor / Claude
 .cursor/
 .claude/
-
-# Local databases
-*.db
-*.db-journal

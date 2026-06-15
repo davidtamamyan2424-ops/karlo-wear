@@ -103,7 +103,7 @@ export async function createOrder(input: CreateOrderInput) {
       0,
     );
 
-    // 2. Генерируем номер заказа (запись сериализуется SQLite — безопасно).
+    // 2. Генерируем номер заказа (атомарно в транзакции).
     const last = await tx.order.findFirst({
       orderBy: { orderNumber: "desc" },
       select: { orderNumber: true },

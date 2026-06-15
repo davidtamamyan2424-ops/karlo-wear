@@ -6,7 +6,7 @@ export function isSize(value: unknown): value is Size {
   return typeof value === "string" && (SIZES as readonly string[]).includes(value);
 }
 
-// Статусы заказа (SQLite не поддерживает enum, поэтому храним строкой).
+// Статусы заказа (храним строкой в БД).
 export const ORDER_STATUSES = [
   "NEW", // Новый
   "AWAITING_PAYMENT", // Ожидает оплаты

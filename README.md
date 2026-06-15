@@ -4,7 +4,7 @@ A clothing store built as a Telegram Mini App.
 
 - **Client**: React + TypeScript + Vite + Tailwind CSS, with Telegram WebApp integration
 - **Server**: Node.js + Express + TypeScript
-- **Database**: Prisma ORM + SQLite
+- **Database**: Prisma ORM + PostgreSQL
 
 ## Conventions
 
@@ -17,7 +17,7 @@ A clothing store built as a Telegram Mini App.
 ```
 karlo-wear/
 ├── client/          # React + Vite frontend (Telegram Mini App)
-├── server/          # Express API + Prisma + SQLite
+├── server/          # Express API + Prisma + PostgreSQL
 ├── package.json     # npm workspaces + root scripts
 └── README.md
 ```
@@ -72,21 +72,22 @@ cp server/.env.example server/.env
 cp client/.env.example client/.env
 ```
 
-Generate the Prisma client and create the database:
+Generate the Prisma client, start PostgreSQL, and apply migrations:
 
 ```bash
 npm run prisma:generate
-npm run prisma:migrate
+
+# Local PostgreSQL (Docker)
+docker compose up -d postgres
+
+# Configure server/.env (see server/.env.example)
+cp server/.env.example server/.env
+
+npm run prisma:migrate:deploy
 ```
 
-> The initial migration (`server/prisma/migrations/*_init`) is already committed.
-> `npm run prisma:migrate` applies it and creates `server/prisma/dev.db`.
->
-> **Windows note:** if you hit `SQLite database error: database is locked` while
-> migrating, it is usually caused by the project folder being synced (OneDrive) or
-> scanned by antivirus. Either pause sync for this folder, exclude it from real-time
-> scanning, or point `DATABASE_URL` at a local non-synced path, e.g.
-> `DATABASE_URL="file:C:/dev/karlo-wear/dev.db"`.
+> The initial migration (`server/prisma/migrations/20260615170000_init`) targets PostgreSQL.
+> For production deploy steps see [server/DEPLOYMENT.md](server/DEPLOYMENT.md).
 
 Seed the database with realistic Russian demo products:
 
@@ -111,4 +112,5 @@ npm run dev
 | `npm run build` | Build server then client |
 | `npm run typecheck` | Type-check both workspaces |
 | `npm run prisma:generate` | Generate Prisma client |
-| `npm run prisma:migrate` | Run Prisma migrations |
+| `npm run prisma:migrate` | Create/apply migrations in development |
+| `npm run prisma:migrate:deploy` | Apply migrations in production/CI |
