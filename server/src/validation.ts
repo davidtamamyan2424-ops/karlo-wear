@@ -105,16 +105,13 @@ const productImagesSchema = z
 
 export const createProductSchema = z.object({
   name: z.string().trim().min(1, "Укажите название"),
-  sku: z.string().trim().min(1, "Укажите артикул").max(64),
   description: z.string().trim().max(4000).optional().nullable(),
   // Цена в копейках (minor units)
   price: z.number().int("Цена должна быть целым числом").min(1, "Укажите цену"),
   composition: z.string().trim().max(200).optional().nullable(),
-  fabricDensity: z.string().trim().max(100).optional().nullable(),
-  modelHeight: z.number().int().min(0).max(300).optional().nullable(),
-  modelSize: z.enum(SIZES).optional().nullable(),
   badge: z.enum(PRODUCT_BADGES).optional().nullable(),
   images: productImagesSchema.optional(),
+  sizeChartUrl: z.string().trim().min(1).max(1000).optional().nullable(),
   isActive: z.boolean().optional(),
   sizes: z.array(sizeStockSchema).max(SIZES.length).optional(),
 });

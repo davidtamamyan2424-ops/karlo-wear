@@ -18,6 +18,7 @@ export interface Product {
   currency: string;
   imageUrl: string | null;
   images: string[];
+  sizeChartUrl: string | null;
   badge: ProductBadge | string | null;
   composition: string | null;
   fabricDensity: string | null;

@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
@@ -20,6 +21,20 @@ function isUniqueViolation(error: unknown): boolean {
   return (
     error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002"
   );
+}
+
+/** Генерирует уникальный артикул (KW-XXXXXXXX). */
+export async function generateProductSku(): Promise<string> {
+  for (let i = 0; i < 100; i++) {
+    const suffix = crypto.randomBytes(4).toString("hex").toUpperCase();
+    const candidate = `KW-${suffix}`;
+    const exists = await prisma.product.findUnique({
+      where: { sku: candidate },
+      select: { id: true },
+    });
+    if (!exists) return candidate;
+  }
+  throw conflict("Не удалось сгенерировать артикул");
 }
 
 export async function listAdminProducts() {
@@ -56,8 +71,8 @@ export async function createProduct(input: CreateProductBody) {
     stock: stockByLabel.get(label) ?? 0,
   }));
   const imageCols = imagesToColumns(input.images) ?? { imagesJson: null, imageUrl: null };
+  const sku = await generateProductSku();
 
-  // Новый товар добавляется в конец списка витрины.
   const last = await prisma.product.findFirst({
     orderBy: { position: "desc" },
     select: { position: true },
@@ -68,26 +83,24 @@ export async function createProduct(input: CreateProductBody) {
     const product = await prisma.product.create({
       data: {
         name: input.name,
-        sku: input.sku,
+        sku,
         position,
         description: input.description ?? null,
         price: input.price,
         currency: "RUB",
         composition: input.composition ?? null,
-        fabricDensity: input.fabricDensity ?? null,
-        modelHeight: input.modelHeight ?? null,
-        modelSize: input.modelSize ?? null,
         badge: input.badge ?? null,
         isActive: input.isActive ?? true,
         imagesJson: imageCols.imagesJson,
         imageUrl: imageCols.imageUrl,
+        sizeChartUrl: input.sizeChartUrl ?? null,
         sizes: { create: sizesData },
       },
       include: { sizes: true },
     });
     return serializeProduct(product);
   } catch (error) {
-    if (isUniqueViolation(error)) throw conflict("Товар с таким артикулом уже существует");
+    if (isUniqueViolation(error)) throw conflict("Не удалось создать товар: конфликт артикула");
     throw error;
   }
 }
@@ -98,15 +111,12 @@ export async function updateProduct(id: string, input: UpdateProductBody) {
 
   const data: Prisma.ProductUpdateInput = {};
   if (input.name !== undefined) data.name = input.name;
-  if (input.sku !== undefined) data.sku = input.sku;
   if (input.price !== undefined) data.price = input.price;
   if (input.isActive !== undefined) data.isActive = input.isActive;
   if ("description" in input) data.description = input.description ?? null;
   if ("composition" in input) data.composition = input.composition ?? null;
-  if ("fabricDensity" in input) data.fabricDensity = input.fabricDensity ?? null;
-  if ("modelHeight" in input) data.modelHeight = input.modelHeight ?? null;
-  if ("modelSize" in input) data.modelSize = input.modelSize ?? null;
   if ("badge" in input) data.badge = input.badge ?? null;
+  if ("sizeChartUrl" in input) data.sizeChartUrl = input.sizeChartUrl ?? null;
 
   const imageCols = imagesToColumns(input.images);
   if (imageCols) {
@@ -128,23 +138,11 @@ export async function updateProduct(id: string, input: UpdateProductBody) {
       }
     });
   } catch (error) {
-    if (isUniqueViolation(error)) throw conflict("Товар с таким артикулом уже существует");
+    if (isUniqueViolation(error)) throw conflict("Не удалось обновить товар");
     throw error;
   }
 
   return getAdminProduct(id);
-}
-
-/** Генерирует уникальный артикул для копии товара. */
-async function generateDuplicateSku(baseSku: string): Promise<string> {
-  let candidate = `${baseSku}-COPY`;
-  let n = 2;
-  while (await prisma.product.findUnique({ where: { sku: candidate }, select: { id: true } })) {
-    candidate = `${baseSku}-COPY-${n}`;
-    n += 1;
-    if (n > 1000) throw conflict("Не удалось сгенерировать артикул для копии");
-  }
-  return candidate;
 }
 
 export async function duplicateProduct(id: string) {
@@ -160,7 +158,7 @@ export async function duplicateProduct(id: string) {
     imageUrl: source.imageUrl,
   };
 
-  const sku = await generateDuplicateSku(source.sku);
+  const sku = await generateProductSku();
 
   const last = await prisma.product.findFirst({
     orderBy: { position: "desc" },
@@ -178,6 +176,7 @@ export async function duplicateProduct(id: string) {
       currency: source.currency,
       imageUrl: imageCols.imageUrl ?? null,
       imagesJson: imageCols.imagesJson ?? null,
+      sizeChartUrl: source.sizeChartUrl,
       category: source.category,
       badge: source.badge,
       composition: source.composition,

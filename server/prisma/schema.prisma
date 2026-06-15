@@ -19,6 +19,7 @@ model Product {
   currency    String        @default("RUB")
   imageUrl    String? // основное изображение (обложка)
   imagesJson  String? // JSON-массив URL изображений для галереи
+  sizeChartUrl String? // размерная сетка (отдельно от фото товара)
   category    String?
   // Бейдж витрины: NEW | BESTSELLER | LIMITED (необязательно)
   badge       String?

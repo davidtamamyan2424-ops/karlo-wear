@@ -27,7 +27,7 @@ import {
   reorderProducts,
   updateProduct,
 } from "../services/adminProducts.js";
-import { uploadProductImages } from "../lib/upload.js";
+import { uploadProductImages, uploadSizeChart } from "../lib/upload.js";
 import { UPLOADS_URL_PREFIX } from "../lib/uploads.js";
 
 export const adminRouter = Router();
@@ -150,5 +150,15 @@ adminRouter.post(
     if (files.length === 0) throw badRequest("Не выбрано ни одного изображения");
     const urls = files.map((file) => `${UPLOADS_URL_PREFIX}/${file.filename}`);
     res.status(201).json({ urls });
+  }),
+);
+
+// Загрузка размерной сетки (одно изображение)
+adminRouter.post(
+  "/products/size-chart",
+  uploadSizeChart.single("image"),
+  asyncHandler(async (req, res) => {
+    if (!req.file) throw badRequest("Не выбрано изображение размерной сетки");
+    res.status(201).json({ url: `${UPLOADS_URL_PREFIX}/${req.file.filename}` });
   }),
 );

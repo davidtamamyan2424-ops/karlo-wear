@@ -34,17 +34,30 @@ export const uploadReceipt = multer({
   },
 });
 
+function imageFileFilter(
+  _req: Express.Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback,
+) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const mimeOk = (ALLOWED_IMAGE_MIME as readonly string[]).includes(file.mimetype);
+  const extOk = (ALLOWED_IMAGE_EXT as readonly string[]).includes(ext);
+  if (mimeOk && extOk) {
+    cb(null, true);
+  } else {
+    cb(badRequest("Поддерживаются только изображения JPG, JPEG, PNG и WEBP"));
+  }
+}
+
 export const uploadProductImages = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 МБ на файл
-  fileFilter: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const mimeOk = (ALLOWED_IMAGE_MIME as readonly string[]).includes(file.mimetype);
-    const extOk = (ALLOWED_IMAGE_EXT as readonly string[]).includes(ext);
-    if (mimeOk && extOk) {
-      cb(null, true);
-    } else {
-      cb(badRequest("Поддерживаются только изображения JPG, JPEG, PNG и WEBP"));
-    }
-  },
+  fileFilter: imageFileFilter,
+});
+
+/** Одно изображение размерной сетки. */
+export const uploadSizeChart = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: imageFileFilter,
 });

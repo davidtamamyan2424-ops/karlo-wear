@@ -88,15 +88,12 @@ export function adminUpdatePaymentAccount(
 // --- Управление товарами ---
 export interface ProductPayload {
   name: string;
-  sku: string;
   description?: string | null;
   price: number; // в копейках
   composition?: string | null;
-  fabricDensity?: string | null;
-  modelHeight?: number | null;
-  modelSize?: ProductBadgeSize | null;
   badge?: ProductBadge | null;
   images?: string[];
+  sizeChartUrl?: string | null;
   isActive?: boolean;
   sizes?: { label: ProductBadgeSize; stock: number }[];
 }
@@ -166,6 +163,17 @@ export function adminUploadProductImages(
   const form = new FormData();
   files.forEach((file) => form.append("images", file));
   return apiUpload<{ urls: string[] }>("/admin/products/images", form, {
+    adminToken: token,
+  });
+}
+
+export function adminUploadSizeChart(
+  token: string,
+  file: File,
+): Promise<{ url: string }> {
+  const form = new FormData();
+  form.append("image", file);
+  return apiUpload<{ url: string }>("/admin/products/size-chart", form, {
     adminToken: token,
   });
 }

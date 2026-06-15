@@ -8,6 +8,7 @@ import {
   adminCreateProduct,
   adminUpdateProduct,
   adminUploadProductImages,
+  adminUploadSizeChart,
   type ProductPayload,
 } from "../../api/endpoints";
 
@@ -28,17 +29,11 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
   const isEdit = Boolean(product);
 
   const [name, setName] = useState(product?.name ?? "");
-  const [sku, setSku] = useState(product?.sku ?? "");
   const [description, setDescription] = useState(product?.description ?? "");
   const [priceRub, setPriceRub] = useState(
     product ? String(Math.round(product.price / 100)) : "",
   );
   const [composition, setComposition] = useState(product?.composition ?? "");
-  const [fabricDensity, setFabricDensity] = useState(product?.fabricDensity ?? "");
-  const [modelHeight, setModelHeight] = useState(
-    product?.modelHeight != null ? String(product.modelHeight) : "",
-  );
-  const [modelSize, setModelSize] = useState<string>(product?.modelSize ?? "");
   const [badge, setBadge] = useState<string>(product?.badge ?? "");
   const [isActive, setIsActive] = useState(product?.isActive ?? true);
 
@@ -52,13 +47,15 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
   const [deltas, setDeltas] = useState<Record<Size, string>>({ S: "", M: "", L: "", XL: "" });
 
   const [images, setImages] = useState<string[]>(product?.images ?? []);
+  const [sizeChartUrl, setSizeChartUrl] = useState<string | null>(product?.sizeChartUrl ?? null);
   const [uploading, setUploading] = useState(false);
+  const [uploadingChart, setUploadingChart] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const chartRef = useRef<HTMLInputElement>(null);
   const dragIndex = useRef<number | null>(null);
 
-  // --- Изображения ---
   const handleUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setUploading(true);
@@ -71,6 +68,22 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  const handleSizeChartUpload = async (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+    setUploadingChart(true);
+    setError(null);
+    try {
+      const { url } = await adminUploadSizeChart(token, file);
+      setSizeChartUrl(url);
+    } catch {
+      setError(t.uploadError);
+    } finally {
+      setUploadingChart(false);
+      if (chartRef.current) chartRef.current.value = "";
     }
   };
 
@@ -95,7 +108,6 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
     });
   };
 
-  // --- Быстрое добавление остатка (только для существующего товара) ---
   const applyDelta = async (label: Size) => {
     const raw = deltas[label].trim();
     if (!raw || !product) return;
@@ -117,7 +129,7 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
   };
 
   const save = async () => {
-    if (!name.trim() || !sku.trim() || !priceRub.trim()) {
+    if (!name.trim() || !priceRub.trim()) {
       setError(t.validationError);
       return;
     }
@@ -131,15 +143,12 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
 
     const payload: ProductPayload = {
       name: name.trim(),
-      sku: sku.trim(),
       description: description.trim() || null,
       price: priceKopecks,
       composition: composition.trim() || null,
-      fabricDensity: fabricDensity.trim() || null,
-      modelHeight: modelHeight.trim() ? Number(modelHeight) : null,
-      modelSize: modelSize ? (modelSize as Size) : null,
       badge: badge ? (badge as ProductBadge) : null,
       images,
+      sizeChartUrl,
       isActive,
       sizes: SIZES.map((label) => ({ label, stock: stock[label] })),
     };
@@ -175,29 +184,22 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
 
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
-      {/* Основные поля */}
       <div className="space-y-3">
         <label className="block">
           <span className="mb-1 block text-xs font-medium">{t.name} *</span>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t.namePlaceholder} className={inputCls} />
         </label>
 
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium">{t.sku} *</span>
-            <input value={sku} onChange={(e) => setSku(e.target.value)} className={inputCls} />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium">{t.price} *</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              value={priceRub}
-              onChange={(e) => setPriceRub(e.target.value)}
-              className={inputCls}
-            />
-          </label>
-        </div>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium">{t.price} *</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            value={priceRub}
+            onChange={(e) => setPriceRub(e.target.value)}
+            className={inputCls}
+          />
+        </label>
 
         <label className="block">
           <span className="mb-1 block text-xs font-medium">{t.description}</span>
@@ -209,40 +211,10 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
           />
         </label>
 
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium">{t.composition}</span>
-            <input value={composition} onChange={(e) => setComposition(e.target.value)} placeholder={t.compositionPlaceholder} className={inputCls} />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium">{t.fabricDensity}</span>
-            <input value={fabricDensity} onChange={(e) => setFabricDensity(e.target.value)} placeholder={t.fabricDensityPlaceholder} className={inputCls} />
-          </label>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium">{t.modelHeight}</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              value={modelHeight}
-              onChange={(e) => setModelHeight(e.target.value)}
-              className={inputCls}
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium">{t.modelSize}</span>
-            <select value={modelSize} onChange={(e) => setModelSize(e.target.value)} className={inputCls}>
-              <option value="">—</option>
-              {SIZES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium">{t.composition}</span>
+          <input value={composition} onChange={(e) => setComposition(e.target.value)} placeholder={t.compositionPlaceholder} className={inputCls} />
+        </label>
 
         <label className="block">
           <span className="mb-1 block text-xs font-medium">{t.badge}</span>
@@ -257,7 +229,6 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
         </label>
       </div>
 
-      {/* Статус публикации */}
       <div className="flex items-center justify-between rounded-xl bg-tg-secondaryBg px-3 py-2.5">
         <span className="text-sm font-medium">{t.status}</span>
         <button
@@ -272,7 +243,7 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
         </button>
       </div>
 
-      {/* Изображения */}
+      {/* Фото товара */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium">{t.images}</span>
@@ -341,6 +312,45 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
               ))}
             </div>
           </>
+        )}
+      </div>
+
+      {/* Размерная сетка */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium">{t.sizeChart}</span>
+          <button
+            type="button"
+            disabled={uploadingChart}
+            onClick={() => chartRef.current?.click()}
+            className="rounded-lg bg-tg-button px-3 py-1.5 text-xs font-medium text-tg-buttonText disabled:opacity-50"
+          >
+            {uploadingChart ? t.uploadingSizeChart : t.uploadSizeChart}
+          </button>
+          <input
+            ref={chartRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+            className="hidden"
+            onChange={(e) => void handleSizeChartUpload(e.target.files)}
+          />
+        </div>
+
+        {sizeChartUrl ? (
+          <div className="relative overflow-hidden rounded-xl border border-black/10 bg-tg-secondaryBg">
+            <img src={imgSrc(sizeChartUrl)} alt="" className="max-h-48 w-full object-contain" />
+            <button
+              type="button"
+              onClick={() => setSizeChartUrl(null)}
+              className="absolute right-2 top-2 rounded-md bg-red-600/90 px-2 py-1 text-[10px] font-medium text-white"
+            >
+              {t.removeSizeChart}
+            </button>
+          </div>
+        ) : (
+          <p className="rounded-lg bg-tg-secondaryBg px-3 py-3 text-center text-xs text-tg-hint">
+            {t.noSizeChart}
+          </p>
         )}
       </div>
 

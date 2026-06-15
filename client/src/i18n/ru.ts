@@ -34,6 +34,8 @@ export const ru = {
     selectSize: "Выберите размер",
     added: "В корзине",
     goToCart: "Перейти в корзину",
+    sizeChart: "Размерная сетка",
+    close: "Закрыть",
   },
   cart: {
     title: "Корзина",
@@ -218,6 +220,11 @@ export const ru = {
       // Изображения
       images: "Фотографии",
       uploadImages: "Загрузить фото",
+      sizeChart: "Размерная сетка",
+      uploadSizeChart: "Загрузить размерную сетку",
+      removeSizeChart: "Удалить размерную сетку",
+      noSizeChart: "Размерная сетка не загружена",
+      uploadingSizeChart: "Загрузка…",
       uploading: "Загрузка…",
       main: "Главное",
       setMain: "Сделать главным",
@@ -229,7 +236,7 @@ export const ru = {
       saveError: "Не удалось сохранить товар",
       duplicateError: "Не удалось дублировать товар",
       uploadError: "Не удалось загрузить изображения",
-      validationError: "Заполните обязательные поля (название, артикул, цена)",
+      validationError: "Заполните обязательные поля (название, цена)",
     },
   },
   notifications: {

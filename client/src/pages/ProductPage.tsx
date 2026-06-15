@@ -9,6 +9,7 @@ import { useCart } from "../cart/CartContext";
 import { useToast } from "../components/Toast";
 import { hapticImpact, hapticNotify, hapticSelection } from "../telegram/webapp";
 import ImageGallery from "../components/ImageGallery";
+import SizeChartModal from "../components/SizeChartModal";
 
 export default function ProductPage() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +22,7 @@ export default function ProductPage() {
   const [selectedSize, setSelectedSize] = useState<Size | null>(null);
   const [addedSize, setAddedSize] = useState<Size | null>(null);
   const [flash, setFlash] = useState(false);
+  const [sizeChartOpen, setSizeChartOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -91,13 +93,24 @@ export default function ProductPage() {
 
       {/* Выбор размера */}
       <div>
-        <div className="mb-2 flex items-baseline justify-between">
+        <div className="mb-2 flex items-baseline justify-between gap-2">
           <p className="text-sm font-medium text-ink">{ru.product.size}</p>
-          {selectedStock != null && selectedStock > 0 && (
-            <span className="text-xs text-muted">
-              {ru.product.inStock} · {selectedStock} {ru.product.pieces}
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {product.sizeChartUrl && (
+              <button
+                type="button"
+                onClick={() => setSizeChartOpen(true)}
+                className="press text-sm font-medium text-ink underline decoration-ink/30 underline-offset-2"
+              >
+                {ru.product.sizeChart}
+              </button>
+            )}
+            {selectedStock != null && selectedStock > 0 && (
+              <span className="text-xs text-muted">
+                {ru.product.inStock} · {selectedStock} {ru.product.pieces}
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           {product.sizes.map((s) => {
@@ -191,6 +204,13 @@ export default function ProductPage() {
       </div>
 
       <div className="h-16" />
+
+      {sizeChartOpen && product.sizeChartUrl && (
+        <SizeChartModal
+          imageUrl={product.sizeChartUrl}
+          onClose={() => setSizeChartOpen(false)}
+        />
+      )}
     </div>
   );
 }
