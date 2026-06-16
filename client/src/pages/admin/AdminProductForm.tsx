@@ -25,6 +25,16 @@ interface Props {
   onSaved: (product: Product) => void;
 }
 
+type VariantForm = {
+  id?: string;
+  name: string;
+  sku: string;
+  priceRub: string;
+  images: string[];
+  stock: Record<Size, number>;
+  deltas: Record<Size, string>;
+};
+
 export default function AdminProductForm({ token, product, onClose, onSaved }: Props) {
   const isEdit = Boolean(product);
 
@@ -36,17 +46,36 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
   const [composition, setComposition] = useState(product?.composition ?? "");
   const [badge, setBadge] = useState<string>(product?.badge ?? "");
   const [isActive, setIsActive] = useState(product?.isActive ?? true);
-
-  const initialStock: Record<Size, number> = { S: 0, M: 0, L: 0, XL: 0 };
-  for (const s of product?.sizes ?? []) {
-    if ((SIZES as readonly string[]).includes(s.label)) {
-      initialStock[s.label as Size] = s.stock;
+  const makeStock = (sizes: { label: string; stock: number }[] = []): Record<Size, number> => {
+    const base: Record<Size, number> = { S: 0, M: 0, L: 0, XL: 0 };
+    for (const size of sizes) {
+      if ((SIZES as readonly string[]).includes(size.label)) base[size.label as Size] = size.stock;
     }
-  }
-  const [stock, setStock] = useState<Record<Size, number>>(initialStock);
-  const [deltas, setDeltas] = useState<Record<Size, string>>({ S: "", M: "", L: "", XL: "" });
-
-  const [images, setImages] = useState<string[]>(product?.images ?? []);
+    return base;
+  };
+  const initialVariants: VariantForm[] =
+    product?.variants?.length
+      ? product.variants.map((variant) => ({
+          id: variant.id,
+          name: variant.name,
+          sku: variant.sku,
+          priceRub: variant.price ? String(Math.round(variant.price / 100)) : "",
+          images: variant.images,
+          stock: makeStock(variant.sizes),
+          deltas: { S: "", M: "", L: "", XL: "" },
+        }))
+      : [
+          {
+            name: "Базовый цвет",
+            sku: product?.sku ?? `KW-${Math.random().toString(16).slice(2, 10).toUpperCase()}`,
+            priceRub: "",
+            images: product?.images ?? [],
+            stock: makeStock(product?.sizes),
+            deltas: { S: "", M: "", L: "", XL: "" },
+          },
+        ];
+  const [variants, setVariants] = useState<VariantForm[]>(initialVariants);
+  const [activeVariantIdx, setActiveVariantIdx] = useState(0);
   const [sizeChartUrl, setSizeChartUrl] = useState<string | null>(product?.sizeChartUrl ?? null);
   const [uploading, setUploading] = useState(false);
   const [uploadingChart, setUploadingChart] = useState(false);
@@ -62,7 +91,11 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
     setError(null);
     try {
       const { urls } = await adminUploadProductImages(token, Array.from(files));
-      setImages((prev) => [...prev, ...urls]);
+      setVariants((prev) =>
+        prev.map((variant, idx) =>
+          idx === activeVariantIdx ? { ...variant, images: [...variant.images, ...urls] } : variant,
+        ),
+      );
     } catch {
       setError(t.uploadError);
     } finally {
@@ -87,41 +120,64 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
     }
   };
 
-  const removeImage = (i: number) => setImages((prev) => prev.filter((_, idx) => idx !== i));
+  const activeVariant = variants[activeVariantIdx];
+  const removeImage = (i: number) =>
+    setVariants((prev) =>
+      prev.map((variant, idx) =>
+        idx === activeVariantIdx
+          ? { ...variant, images: variant.images.filter((_, imageIdx) => imageIdx !== i) }
+          : variant,
+      ),
+    );
   const setMain = (i: number) =>
-    setImages((prev) => {
-      const copy = [...prev];
-      const [item] = copy.splice(i, 1);
-      copy.unshift(item);
-      return copy;
-    });
+    setVariants((prev) =>
+      prev.map((variant, idx) => {
+        if (idx !== activeVariantIdx) return variant;
+        const copy = [...variant.images];
+        const [item] = copy.splice(i, 1);
+        copy.unshift(item);
+        return { ...variant, images: copy };
+      }),
+    );
 
   const onDrop = (target: number) => {
     const from = dragIndex.current;
     dragIndex.current = null;
     if (from == null || from === target) return;
-    setImages((prev) => {
-      const copy = [...prev];
-      const [item] = copy.splice(from, 1);
-      copy.splice(target, 0, item);
-      return copy;
-    });
+    setVariants((prev) =>
+      prev.map((variant, idx) => {
+        if (idx !== activeVariantIdx) return variant;
+        const copy = [...variant.images];
+        const [item] = copy.splice(from, 1);
+        copy.splice(target, 0, item);
+        return { ...variant, images: copy };
+      }),
+    );
   };
 
   const applyDelta = async (label: Size) => {
-    const raw = deltas[label].trim();
+    const raw = activeVariant?.deltas[label]?.trim() ?? "";
     if (!raw || !product) return;
     const delta = Number(raw);
     if (!Number.isInteger(delta) || delta === 0) return;
     setError(null);
     try {
-      const updated = await adminAdjustStock(token, product.id, label, delta);
-      const next = { ...stock };
-      for (const s of updated.sizes) {
-        if ((SIZES as readonly string[]).includes(s.label)) next[s.label as Size] = s.stock;
+      const updated = await adminAdjustStock(token, product.id, label, delta, activeVariant.id);
+      const updatedVariant =
+        updated.variants.find((variant) => variant.id === activeVariant.id) ?? updated.variants[0];
+      if (updatedVariant) {
+        setVariants((prev) =>
+          prev.map((variant, idx) =>
+            idx === activeVariantIdx
+              ? {
+                  ...variant,
+                  stock: makeStock(updatedVariant.sizes),
+                  deltas: { ...variant.deltas, [label]: "" },
+                }
+              : variant,
+          ),
+        );
       }
-      setStock(next);
-      setDeltas((d) => ({ ...d, [label]: "" }));
       onSaved(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.saveError);
@@ -130,6 +186,14 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
 
   const save = async () => {
     if (!name.trim() || !priceRub.trim()) {
+      setError(t.validationError);
+      return;
+    }
+    if (variants.length === 0) {
+      setError(t.validationError);
+      return;
+    }
+    if (variants.some((variant) => !variant.name.trim() || !variant.sku.trim())) {
       setError(t.validationError);
       return;
     }
@@ -147,10 +211,16 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
       price: priceKopecks,
       composition: composition.trim() || null,
       badge: badge ? (badge as ProductBadge) : null,
-      images,
       sizeChartUrl,
       isActive,
-      sizes: SIZES.map((label) => ({ label, stock: stock[label] })),
+      variants: variants.map((variant) => ({
+        id: variant.id,
+        name: variant.name.trim(),
+        sku: variant.sku.trim(),
+        price: variant.priceRub.trim() ? Math.round(Number(variant.priceRub) * 100) : null,
+        images: variant.images,
+        sizes: SIZES.map((label) => ({ label, stock: variant.stock[label] })),
+      })),
     };
 
     try {
@@ -206,8 +276,8 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            className={`${inputCls} resize-none`}
+            rows={5}
+            className={`${inputCls} resize-y min-h-[140px]`}
           />
         </label>
 
@@ -243,7 +313,45 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
         </button>
       </div>
 
-      {/* Фото товара */}
+      {/* Варианты цветов */}
+      <div className="space-y-2 rounded-xl border border-black/10 p-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium">{t.variants}</span>
+          <button
+            type="button"
+            onClick={() =>
+              setVariants((prev) => [
+                ...prev,
+                {
+                  name: "",
+                  sku: `${product?.sku ?? "KW"}-${prev.length + 1}`,
+                  priceRub: "",
+                  images: [],
+                  stock: { S: 0, M: 0, L: 0, XL: 0 },
+                  deltas: { S: "", M: "", L: "", XL: "" },
+                },
+              ])
+            }
+            className="rounded-lg bg-tg-button px-3 py-1.5 text-xs font-medium text-tg-buttonText"
+          >
+            {t.addVariant}
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {variants.map((variant, idx) => (
+            <button
+              key={variant.id ?? `new-${idx}`}
+              type="button"
+              onClick={() => setActiveVariantIdx(idx)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium ${idx === activeVariantIdx ? "bg-ink text-white" : "bg-tg-secondaryBg"}`}
+            >
+              {variant.name || `Цвет ${idx + 1}`}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Фото варианта */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium">{t.images}</span>
@@ -265,7 +373,7 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
           />
         </div>
 
-        {images.length === 0 ? (
+        {activeVariant.images.length === 0 ? (
           <p className="rounded-lg bg-tg-secondaryBg px-3 py-3 text-center text-xs text-tg-hint">
             {t.noImages}
           </p>
@@ -273,7 +381,7 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
           <>
             <p className="text-xs text-tg-hint">{t.dragHint}</p>
             <div className="grid grid-cols-3 gap-2">
-              {images.map((url, i) => (
+              {activeVariant.images.map((url, i) => (
                 <div
                   key={`${url}-${i}`}
                   draggable
@@ -357,6 +465,50 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
       {/* Остатки по размерам */}
       <div className="space-y-2">
         <span className="text-sm font-medium">{t.sizesStock}</span>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium">{t.colorName} *</span>
+          <input
+            value={activeVariant.name}
+            onChange={(e) =>
+              setVariants((prev) =>
+                prev.map((variant, idx) =>
+                  idx === activeVariantIdx ? { ...variant, name: e.target.value } : variant,
+                ),
+              )
+            }
+            className={inputCls}
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium">{t.variantSku} *</span>
+          <input
+            value={activeVariant.sku}
+            onChange={(e) =>
+              setVariants((prev) =>
+                prev.map((variant, idx) =>
+                  idx === activeVariantIdx ? { ...variant, sku: e.target.value } : variant,
+                ),
+              )
+            }
+            className={inputCls}
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium">{t.variantPrice}</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            value={activeVariant.priceRub}
+            onChange={(e) =>
+              setVariants((prev) =>
+                prev.map((variant, idx) =>
+                  idx === activeVariantIdx ? { ...variant, priceRub: e.target.value } : variant,
+                ),
+              )
+            }
+            className={inputCls}
+          />
+        </label>
         <div className="space-y-2">
           {SIZES.map((label) => (
             <div key={label} className="flex items-center gap-2 rounded-xl bg-tg-secondaryBg p-2">
@@ -367,9 +519,21 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
                   type="number"
                   inputMode="numeric"
                   min={0}
-                  value={stock[label]}
+                  value={activeVariant.stock[label]}
                   onChange={(e) =>
-                    setStock((prev) => ({ ...prev, [label]: Math.max(0, Number(e.target.value) || 0) }))
+                    setVariants((prev) =>
+                      prev.map((variant, idx) =>
+                        idx === activeVariantIdx
+                          ? {
+                              ...variant,
+                              stock: {
+                                ...variant.stock,
+                                [label]: Math.max(0, Number(e.target.value) || 0),
+                              },
+                            }
+                          : variant,
+                      ),
+                    )
                   }
                   className="w-16 rounded-lg border border-black/15 bg-white px-2 py-1.5 text-sm"
                 />
@@ -381,8 +545,19 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
                     type="number"
                     inputMode="numeric"
                     placeholder="+/-"
-                    value={deltas[label]}
-                    onChange={(e) => setDeltas((d) => ({ ...d, [label]: e.target.value }))}
+                    value={activeVariant.deltas[label]}
+                    onChange={(e) =>
+                      setVariants((prev) =>
+                        prev.map((variant, idx) =>
+                          idx === activeVariantIdx
+                            ? {
+                                ...variant,
+                                deltas: { ...variant.deltas, [label]: e.target.value },
+                              }
+                            : variant,
+                        ),
+                      )
+                    }
                     className="w-16 rounded-lg border border-black/15 bg-white px-2 py-1.5 text-sm"
                     title={t.addStockHint}
                   />
@@ -393,9 +568,10 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
                   >
                     {t.apply}
                   </button>
-                  {deltas[label].trim() && Number.isInteger(Number(deltas[label])) && (
+                  {activeVariant.deltas[label].trim() &&
+                    Number.isInteger(Number(activeVariant.deltas[label])) && (
                     <span className="text-[11px] text-tg-hint">
-                      → {Math.max(0, stock[label] + Number(deltas[label]))}
+                      → {Math.max(0, activeVariant.stock[label] + Number(activeVariant.deltas[label]))}
                     </span>
                   )}
                 </div>
@@ -404,6 +580,19 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
           ))}
         </div>
         {isEdit && <p className="text-xs text-tg-hint">{t.addStockHint}</p>}
+        {variants.length > 1 && (
+          <button
+            type="button"
+            onClick={() => {
+              const next = variants.filter((_, idx) => idx !== activeVariantIdx);
+              setVariants(next);
+              setActiveVariantIdx(Math.max(0, activeVariantIdx - 1));
+            }}
+            className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700"
+          >
+            {t.removeVariant}
+          </button>
+        )}
       </div>
 
       <div className="flex gap-2 pt-1">

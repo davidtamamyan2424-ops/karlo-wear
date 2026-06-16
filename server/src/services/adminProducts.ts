@@ -17,6 +17,14 @@ function imagesToColumns(images: string[] | undefined) {
   };
 }
 
+function variantImagesToColumns(images: string[] | undefined) {
+  if (images === undefined) return undefined;
+  return {
+    imagesJson: images.length > 0 ? JSON.stringify(images) : null,
+    imageUrl: images[0] ?? null,
+  };
+}
+
 function isUniqueViolation(error: unknown): boolean {
   return (
     error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002"
@@ -39,7 +47,10 @@ export async function generateProductSku(): Promise<string> {
 
 export async function listAdminProducts() {
   const products = await prisma.product.findMany({
-    include: { sizes: true },
+    include: {
+      sizes: true,
+      variants: { include: { sizes: true }, orderBy: { createdAt: "asc" } },
+    },
     orderBy: [{ position: "asc" }, { createdAt: "desc" }],
   });
   return products.map(serializeProduct);
@@ -58,18 +69,32 @@ export async function reorderProducts(ids: string[]) {
 export async function getAdminProduct(id: string) {
   const product = await prisma.product.findUnique({
     where: { id },
-    include: { sizes: true },
+    include: {
+      sizes: true,
+      variants: { include: { sizes: true }, orderBy: { createdAt: "asc" } },
+    },
   });
   if (!product) throw notFound("Товар не найден");
   return serializeProduct(product);
 }
 
 export async function createProduct(input: CreateProductBody) {
-  const stockByLabel = new Map(input.sizes?.map((s) => [s.label, s.stock]));
-  const sizesData = SIZES.map((label) => ({
-    label,
-    stock: stockByLabel.get(label) ?? 0,
-  }));
+  const variantInputs = input.variants?.length
+    ? input.variants
+    : [
+        {
+          name: "Базовый цвет",
+          sku: `${await generateProductSku()}-01`,
+          price: null,
+          images: input.images ?? [],
+          sizes: SIZES.map((label) => {
+            const legacy = input.sizes?.find((s) => s.label === label);
+            return { label, stock: legacy?.stock ?? 0 };
+          }),
+        },
+      ];
+  const stockByLabel = new Map(variantInputs[0].sizes.map((s) => [s.label, s.stock]));
+  const sizesData = SIZES.map((label) => ({ label, stock: stockByLabel.get(label) ?? 0 }));
   const imageCols = imagesToColumns(input.images) ?? { imagesJson: null, imageUrl: null };
   const sku = await generateProductSku();
 
@@ -95,8 +120,30 @@ export async function createProduct(input: CreateProductBody) {
         imageUrl: imageCols.imageUrl,
         sizeChartUrl: input.sizeChartUrl ?? null,
         sizes: { create: sizesData },
+        variants: {
+          create: variantInputs.map((variant, index) => {
+            const imageCols = variantImagesToColumns(variant.images) ?? {
+              imageUrl: null,
+              imagesJson: null,
+            };
+            return {
+              name: variant.name,
+              sku: variant.sku,
+              price: variant.price ?? null,
+              imageUrl: imageCols.imageUrl,
+              imagesJson: imageCols.imagesJson,
+              isDefault: index === 0,
+              sizes: {
+                create: SIZES.map((label) => {
+                  const size = variant.sizes.find((s) => s.label === label);
+                  return { label, stock: size?.stock ?? 0 };
+                }),
+              },
+            };
+          }),
+        },
       },
-      include: { sizes: true },
+      include: { sizes: true, variants: { include: { sizes: true } } },
     });
     return serializeProduct(product);
   } catch (error) {
@@ -124,6 +171,7 @@ export async function updateProduct(id: string, input: UpdateProductBody) {
     data.imageUrl = imageCols.imageUrl;
   }
 
+  const variantInputs = input.variants;
   try {
     await prisma.$transaction(async (tx) => {
       await tx.product.update({ where: { id }, data });
@@ -133,6 +181,89 @@ export async function updateProduct(id: string, input: UpdateProductBody) {
             where: { productId_label: { productId: id, label: size.label } },
             update: { stock: size.stock },
             create: { productId: id, label: size.label, stock: size.stock },
+          });
+        }
+      }
+      if (variantInputs) {
+        const nextIds = new Set(variantInputs.map((v) => v.id).filter(Boolean));
+        const existingVariants = await tx.productVariant.findMany({
+          where: { productId: id },
+          select: { id: true },
+        });
+        const deleteIds = existingVariants
+          .map((v) => v.id)
+          .filter((variantId) => !nextIds.has(variantId));
+        if (deleteIds.length) {
+          await tx.productVariant.deleteMany({ where: { id: { in: deleteIds } } });
+        }
+
+        for (let i = 0; i < variantInputs.length; i += 1) {
+          const variant = variantInputs[i];
+          const imageCols = variantImagesToColumns(variant.images) ?? {
+            imageUrl: null,
+            imagesJson: null,
+          };
+          if (variant.id) {
+            await tx.productVariant.update({
+              where: { id: variant.id },
+              data: {
+                name: variant.name,
+                sku: variant.sku,
+                price: variant.price ?? null,
+                imageUrl: imageCols.imageUrl,
+                imagesJson: imageCols.imagesJson,
+                isDefault: i === 0,
+              },
+            });
+          } else {
+            await tx.productVariant.create({
+              data: {
+                productId: id,
+                name: variant.name,
+                sku: variant.sku,
+                price: variant.price ?? null,
+                imageUrl: imageCols.imageUrl,
+                imagesJson: imageCols.imagesJson,
+                isDefault: i === 0,
+              },
+            });
+          }
+        }
+
+        const variants = await tx.productVariant.findMany({
+          where: { productId: id },
+          include: { sizes: true },
+          orderBy: { createdAt: "asc" },
+        });
+        const newVariantPayloads = variantInputs.filter((v) => !v.id);
+        for (const variant of variants) {
+          const payload =
+            variantInputs.find((v) => v.id === variant.id) ?? newVariantPayloads.shift();
+          if (!payload) continue;
+          for (const size of payload.sizes) {
+            await tx.productVariantSize.upsert({
+              where: { variantId_label: { variantId: variant.id, label: size.label } },
+              update: { stock: size.stock },
+              create: { variantId: variant.id, label: size.label, stock: size.stock },
+            });
+          }
+        }
+
+        const defaultVariant = variants[0];
+        if (defaultVariant) {
+          const defaultSizes = await tx.productVariantSize.findMany({
+            where: { variantId: defaultVariant.id },
+          });
+          for (const size of defaultSizes) {
+            await tx.productSize.upsert({
+              where: { productId_label: { productId: id, label: size.label } },
+              update: { stock: size.stock },
+              create: { productId: id, label: size.label, stock: size.stock },
+            });
+          }
+          await tx.product.update({
+            where: { id },
+            data: { imageUrl: defaultVariant.imageUrl, imagesJson: defaultVariant.imagesJson },
           });
         }
       }
@@ -148,7 +279,7 @@ export async function updateProduct(id: string, input: UpdateProductBody) {
 export async function duplicateProduct(id: string) {
   const source = await prisma.product.findUnique({
     where: { id },
-    include: { sizes: true },
+    include: { sizes: true, variants: { include: { sizes: true }, orderBy: { createdAt: "asc" } } },
   });
   if (!source) throw notFound("Товар не найден");
 
@@ -187,21 +318,43 @@ export async function duplicateProduct(id: string) {
       sizes: {
         create: SIZES.map((label) => ({ label, stock: 0 })),
       },
+      variants: {
+        create: source.variants.map((variant, index) => ({
+          name: variant.name,
+          sku: `${variant.sku}-COPY-${index + 1}`,
+          price: variant.price,
+          imageUrl: variant.imageUrl,
+          imagesJson: variant.imagesJson,
+          isDefault: variant.isDefault,
+          sizes: {
+            create: SIZES.map((label) => ({ label, stock: 0 })),
+          },
+        })),
+      },
     },
-    include: { sizes: true },
+    include: { sizes: true, variants: { include: { sizes: true } } },
   });
 
   return serializeProduct(product);
 }
 
 /** Изменяет остаток по размеру на delta. Результат не может быть отрицательным. */
-export async function adjustStock(id: string, label: string, delta: number) {
+export async function adjustStock(id: string, label: string, delta: number, variantId?: string) {
   await prisma.$transaction(async (tx) => {
     const product = await tx.product.findUnique({ where: { id } });
     if (!product) throw notFound("Товар не найден");
 
-    const size = await tx.productSize.findUnique({
-      where: { productId_label: { productId: id, label } },
+    const targetVariantId =
+      variantId ??
+      (
+        await tx.productVariant.findFirst({
+          where: { productId: id, isDefault: true },
+          select: { id: true },
+        })
+      )?.id;
+    if (!targetVariantId) throw notFound("Вариант товара не найден");
+    const size = await tx.productVariantSize.findUnique({
+      where: { variantId_label: { variantId: targetVariantId, label } },
     });
 
     const current = size?.stock ?? 0;
@@ -211,14 +364,29 @@ export async function adjustStock(id: string, label: string, delta: number) {
     }
 
     if (size) {
-      await tx.productSize.update({
+      await tx.productVariantSize.update({
         where: { id: size.id },
         data: { stock: next },
       });
     } else {
-      await tx.productSize.create({ data: { productId: id, label, stock: next } });
+      await tx.productVariantSize.create({ data: { variantId: targetVariantId, label, stock: next } });
+    }
+    const defaultVariant = await tx.productVariant.findFirst({
+      where: { productId: id, isDefault: true },
+      select: { id: true },
+    });
+    if (defaultVariant?.id === targetVariantId) {
+      await tx.productSize.upsert({
+        where: { productId_label: { productId: id, label } },
+        update: { stock: next },
+        create: { productId: id, label, stock: next },
+      });
     }
   });
 
   return getAdminProduct(id);
+}
+
+export async function deleteProduct(id: string) {
+  await prisma.product.delete({ where: { id } });
 }

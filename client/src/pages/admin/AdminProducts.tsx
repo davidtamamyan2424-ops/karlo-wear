@@ -5,6 +5,7 @@ import type { Product } from "../../types";
 import { fileUrl } from "../../api/client";
 import { formatPrice } from "../../lib/format";
 import {
+  adminDeleteProduct,
   adminDuplicateProduct,
   adminFetchProducts,
   adminReorderProducts,
@@ -65,6 +66,20 @@ export default function AdminProducts({ token }: { token: string }) {
       setForm({ product: copy });
     } catch {
       setError(t.duplicateError);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const removeProduct = async (product: Product) => {
+    if (!window.confirm(t.deleteConfirm)) return;
+    setBusyId(product.id);
+    setError(null);
+    try {
+      await adminDeleteProduct(token, product.id);
+      setProducts((prev) => (prev ?? []).filter((item) => item.id !== product.id));
+    } catch {
+      setError(t.saveError);
     } finally {
       setBusyId(null);
     }
@@ -231,6 +246,14 @@ export default function AdminProducts({ token }: { token: string }) {
                     className="rounded-lg bg-tg-secondaryBg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
                   >
                     {t.duplicate}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyId === product.id}
+                    onClick={() => void removeProduct(product)}
+                    className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 disabled:opacity-50"
+                  >
+                    {t.delete}
                   </button>
                   <button
                     type="button"

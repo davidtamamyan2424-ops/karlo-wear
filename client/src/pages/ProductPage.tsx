@@ -20,6 +20,7 @@ export default function ProductPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<Size | null>(null);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [addedSize, setAddedSize] = useState<Size | null>(null);
   const [flash, setFlash] = useState(false);
   const [sizeChartOpen, setSizeChartOpen] = useState(false);
@@ -31,6 +32,12 @@ export default function ProductPage() {
       .then(setProduct)
       .catch(() => setError(ru.common.error));
   }, [id]);
+
+  useEffect(() => {
+    if (!product) return;
+    setSelectedVariantId(product.defaultVariantId ?? product.variants[0]?.id ?? null);
+    setSelectedSize(null);
+  }, [product]);
 
   if (error) {
     return <p className="py-10 text-center text-sm text-red-600">{error}</p>;
@@ -45,8 +52,11 @@ export default function ProductPage() {
     );
   }
 
+  const selectedVariant =
+    product.variants.find((variant) => variant.id === selectedVariantId) ?? product.variants[0];
+  const variantSizes = selectedVariant?.sizes ?? product.sizes;
   const selectedStock = selectedSize
-    ? (product.sizes.find((s) => s.label === selectedSize)?.stock ?? 0)
+    ? (variantSizes.find((s) => s.label === selectedSize)?.stock ?? 0)
     : null;
 
   const inCart = addedSize !== null && addedSize === selectedSize;
@@ -57,7 +67,7 @@ export default function ProductPage() {
       return;
     }
     if (!selectedSize) return;
-    const ok = addItem(product, selectedSize);
+    const ok = addItem(product, selectedSize, 1, selectedVariant?.id);
     if (ok) {
       hapticImpact("medium");
       show(ru.notifications.addedToCart, "success");
@@ -80,7 +90,7 @@ export default function ProductPage() {
   return (
     <div className="animate-fade-in space-y-5">
       <ImageGallery
-        images={product.images}
+        images={selectedVariant?.images?.length ? selectedVariant.images : product.images}
         alt={product.name}
         aspect="3/4"
         eagerFirst
@@ -88,8 +98,38 @@ export default function ProductPage() {
 
       <div>
         <h1 className="text-xl font-semibold tracking-tight text-ink">{product.name}</h1>
-        <p className="mt-1.5 text-2xl font-semibold text-ink">{formatPrice(product.price)}</p>
+        <p className="mt-1.5 text-2xl font-semibold text-ink">
+          {formatPrice(selectedVariant?.price ?? product.price)}
+        </p>
       </div>
+
+      {product.variants.length > 1 && (
+        <div>
+          <p className="mb-2 text-sm font-medium text-ink">{ru.product.color}</p>
+          <div className="flex flex-wrap gap-2">
+            {product.variants.map((variant) => {
+              const active = selectedVariant?.id === variant.id;
+              return (
+                <button
+                  key={variant.id}
+                  type="button"
+                  onClick={() => {
+                    hapticSelection();
+                    setSelectedVariantId(variant.id);
+                    setSelectedSize(null);
+                  }}
+                  className={[
+                    "press rounded-button px-3 py-2 text-sm font-medium",
+                    active ? "bg-ink text-white" : "bg-surface text-ink hover:bg-line",
+                  ].join(" ")}
+                >
+                  {variant.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Выбор размера */}
       <div>
@@ -113,7 +153,7 @@ export default function ProductPage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {product.sizes.map((s) => {
+          {variantSizes.map((s) => {
             const disabled = s.stock <= 0;
             const active = selectedSize === s.label;
             return (
@@ -144,7 +184,7 @@ export default function ProductPage() {
       {product.description && (
         <div>
           <h2 className="mb-1.5 text-sm font-semibold text-ink">{ru.product.description}</h2>
-          <p className="text-sm leading-relaxed text-muted">{product.description}</p>
+          <p className="whitespace-pre-line text-sm leading-relaxed text-muted">{product.description}</p>
         </div>
       )}
 
@@ -158,7 +198,7 @@ export default function ProductPage() {
           {product.modelHeight != null &&
             detailRow(ru.product.modelHeight, formatHeight(product.modelHeight))}
           {product.modelSize && detailRow(ru.product.modelSize, product.modelSize)}
-          {detailRow(ru.product.sku, product.sku)}
+          {detailRow(ru.product.sku, selectedVariant?.sku ?? product.sku)}
         </div>
       </div>
 

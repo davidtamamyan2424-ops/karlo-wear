@@ -7,6 +7,26 @@ export interface ProductSize {
   stock: number;
 }
 
+export interface ProductVariantSize {
+  id: string;
+  variantId: string;
+  label: Size;
+  stock: number;
+}
+
+export interface ProductVariant {
+  id: string;
+  productId: string;
+  name: string;
+  sku: string;
+  price: number | null;
+  imageUrl: string | null;
+  images: string[];
+  isDefault: boolean;
+  sizes: ProductVariantSize[];
+  totalStock?: number;
+}
+
 export type ProductBadge = "NEW" | "BESTSELLER" | "LIMITED";
 
 export interface Product {
@@ -27,6 +47,8 @@ export interface Product {
   modelSize: string | null;
   isActive: boolean;
   sizes: ProductSize[];
+  variants: ProductVariant[];
+  defaultVariantId?: string | null;
   totalStock?: number;
 }
 
@@ -91,5 +113,5 @@ export interface CreateOrderPayload {
   deliveryAddress?: string | null;
   deliveryComment?: string | null;
   deliveryConfirmed: boolean;
-  items: { productId: string; sizeLabel: Size; quantity: number }[];
+  items: { productId: string; variantId?: string; sizeLabel: Size; quantity: number }[];
 }

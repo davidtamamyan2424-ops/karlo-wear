@@ -101,6 +101,7 @@ export default function CheckoutPage() {
         deliveryConfirmed: deliveryAck,
         items: items.map((i) => ({
           productId: i.productId,
+          variantId: i.variantId,
           sizeLabel: i.size,
           quantity: i.quantity,
         })),

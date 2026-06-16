@@ -11,8 +11,10 @@ import type { Product } from "../types";
 import type { Size } from "../constants";
 
 export interface CartItem {
-  key: string; // productId__size
+  key: string; // productId__variantId__size
   productId: string;
+  variantId: string;
+  variantName: string;
   sku: string;
   name: string;
   imageUrl: string | null;
@@ -28,7 +30,7 @@ interface CartContextValue {
   subtotal: number;
   total: number;
   /** Добавляет товар. Возвращает false, если достигнут лимит склада. */
-  addItem: (product: Product, size: Size, quantity?: number) => boolean;
+  addItem: (product: Product, size: Size, quantity?: number, variantId?: string) => boolean;
   setQuantity: (key: string, quantity: number) => void;
   removeItem: (key: string) => void;
   clear: () => void;
@@ -38,8 +40,8 @@ const STORAGE_KEY = "karlo-wear-cart";
 
 const CartContext = createContext<CartContextValue | null>(null);
 
-function itemKey(productId: string, size: Size): string {
-  return `${productId}__${size}`;
+function itemKey(productId: string, variantId: string, size: Size): string {
+  return `${productId}__${variantId}__${size}`;
 }
 
 function loadCart(): CartItem[] {
@@ -60,12 +62,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   }, [items]);
 
-  const addItem = useCallback<CartContextValue["addItem"]>((product, size, quantity = 1) => {
-    const sizeInfo = product.sizes.find((s) => s.label === size);
+  const addItem = useCallback<CartContextValue["addItem"]>((product, size, quantity = 1, variantId) => {
+    const variant =
+      product.variants.find((v) => v.id === variantId) ??
+      product.variants.find((v) => v.id === product.defaultVariantId) ??
+      product.variants[0];
+    if (!variant) return false;
+    const sizeInfo = variant.sizes.find((s) => s.label === size);
     const maxStock = sizeInfo?.stock ?? 0;
     if (maxStock <= 0) return false;
 
-    const key = itemKey(product.id, size);
+    const key = itemKey(product.id, variant.id, size);
     let added = true;
 
     setItems((prev) => {
@@ -86,10 +93,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
         {
           key,
           productId: product.id,
-          sku: product.sku,
+          variantId: variant.id,
+          variantName: variant.name,
+          sku: variant.sku,
           name: product.name,
-          imageUrl: product.imageUrl,
-          price: product.price,
+          imageUrl: variant.imageUrl ?? product.imageUrl,
+          price: variant.price ?? product.price,
           size,
           quantity: next,
           maxStock,

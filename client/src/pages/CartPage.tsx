@@ -67,6 +67,9 @@ export default function CartPage() {
                 </button>
               </div>
               <p className="mt-0.5 text-xs text-muted">
+                {ru.product.color}: {item.variantName}
+              </p>
+              <p className="mt-0.5 text-xs text-muted">
                 {ru.product.size}: {item.size}
               </p>
 

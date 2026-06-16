@@ -17,6 +17,7 @@ const ORDER_NUMBER_START = 1000;
 
 export interface CreateOrderItemInput {
   productId: string;
+  variantId?: string;
   sizeLabel: string;
   quantity: number;
 }
@@ -55,8 +56,12 @@ export async function createOrder(input: CreateOrderInput) {
     // 1. Резервируем склад атомарно (защита от оверселла под нагрузкой).
     const lineItems: {
       productId: string;
-      productSizeId: string;
+      productVariantId: string | null;
+      productVariantSizeId: string | null;
+      productSizeId: string | null;
       productName: string;
+      variantName: string | null;
+      variantSku: string | null;
       sizeLabel: string;
       unitPrice: number;
       quantity: number;
@@ -67,33 +72,56 @@ export async function createOrder(input: CreateOrderInput) {
         throw badRequest("Неверное количество товара");
       }
 
-      const size = await tx.productSize.findFirst({
-        where: { productId: item.productId, label: item.sizeLabel },
-        include: { product: true },
+      const size = await tx.productVariantSize.findFirst({
+        where: {
+          label: item.sizeLabel,
+          variant: {
+            productId: item.productId,
+            ...(item.variantId ? { id: item.variantId } : { isDefault: true }),
+          },
+        },
+        include: { variant: { include: { product: true } } },
       });
 
-      if (!size || !size.product.isActive) {
+      if (!size || !size.variant.product.isActive) {
         throw notFound("Товар не найден");
       }
 
       // Условный декремент: уменьшаем остаток только если его достаточно.
-      const updated = await tx.productSize.updateMany({
+      const updated = await tx.productVariantSize.updateMany({
         where: { id: size.id, stock: { gte: item.quantity } },
         data: { stock: { decrement: item.quantity } },
       });
 
       if (updated.count !== 1) {
         throw conflict(
-          `Недостаточно товара «${size.product.name}» размера ${size.label} на складе`,
+          `Недостаточно товара «${size.variant.product.name}» размера ${size.label} на складе`,
         );
       }
 
+      if (size.variant.isDefault) {
+        await tx.productSize.updateMany({
+          where: { productId: size.variant.productId, label: size.label, stock: { gte: item.quantity } },
+          data: { stock: { decrement: item.quantity } },
+        });
+      }
+      const baseSize = size.variant.isDefault
+        ? await tx.productSize.findFirst({
+            where: { productId: size.variant.productId, label: size.label },
+            select: { id: true },
+          })
+        : null;
+
       lineItems.push({
-        productId: size.productId,
-        productSizeId: size.id,
-        productName: size.product.name,
+        productId: size.variant.productId,
+        productVariantId: size.variantId,
+        productVariantSizeId: size.id,
+        productSizeId: baseSize?.id ?? null,
+        productName: size.variant.product.name,
+        variantName: size.variant.name,
+        variantSku: size.variant.sku,
         sizeLabel: size.label,
-        unitPrice: size.product.price,
+        unitPrice: size.variant.price ?? size.variant.product.price,
         quantity: item.quantity,
       });
     }
@@ -225,7 +253,13 @@ async function restoreStock(
 
   for (const item of order.items) {
     if (item.productSizeId) {
-      await tx.productSize.update({
+      if (item.productVariantSizeId) {
+        await tx.productVariantSize.update({
+          where: { id: item.productVariantSizeId },
+          data: { stock: { increment: item.quantity } },
+        });
+      }
+      await tx.productSize.updateMany({
         where: { id: item.productSizeId },
         data: { stock: { increment: item.quantity } },
       });

@@ -21,6 +21,7 @@ import {
 import {
   adjustStock,
   createProduct,
+  deleteProduct,
   duplicateProduct,
   getAdminProduct,
   listAdminProducts,
@@ -136,8 +137,16 @@ adminRouter.post(
 adminRouter.post(
   "/products/:id/stock",
   asyncHandler(async (req, res) => {
-    const { label, delta } = stockAdjustSchema.parse(req.body);
-    res.json(await adjustStock(req.params.id, label, delta));
+    const { label, delta, variantId } = stockAdjustSchema.parse(req.body);
+    res.json(await adjustStock(req.params.id, label, delta, variantId));
+  }),
+);
+
+adminRouter.delete(
+  "/products/:id",
+  asyncHandler(async (req, res) => {
+    await deleteProduct(req.params.id);
+    res.status(204).send();
   }),
 );
 

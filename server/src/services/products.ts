@@ -1,4 +1,4 @@
-import type { Product, ProductSize } from "@prisma/client";
+import type { Product, ProductSize, ProductVariant, ProductVariantSize } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { notFound } from "../lib/errors.js";
 import { SIZES } from "../constants.js";
@@ -12,10 +12,10 @@ function sortSizes<T extends { label: string }>(sizes: T[]): T[] {
 }
 
 /** Парсит imagesJson в массив URL; при отсутствии — использует обложку. */
-function parseImages(product: Product): string[] {
-  if (product.imagesJson) {
+function parseImagesFromRaw(imagesJson: string | null, imageUrl: string | null): string[] {
+  if (imagesJson) {
     try {
-      const parsed = JSON.parse(product.imagesJson);
+      const parsed = JSON.parse(imagesJson);
       if (Array.isArray(parsed)) {
         const urls = parsed.filter((u): u is string => typeof u === "string" && u.length > 0);
         if (urls.length > 0) return urls;
@@ -24,19 +24,66 @@ function parseImages(product: Product): string[] {
       // ignore malformed JSON, fall through to cover image
     }
   }
-  return product.imageUrl ? [product.imageUrl] : [];
+  return imageUrl ? [imageUrl] : [];
 }
 
-type ProductWithSizes = Product & { sizes: ProductSize[] };
+type VariantWithSizes = ProductVariant & { sizes: ProductVariantSize[] };
+type ProductWithRelations = Product & {
+  sizes: ProductSize[];
+  variants: VariantWithSizes[];
+};
+
+function normalizeVariants(product: ProductWithRelations): VariantWithSizes[] {
+  if (product.variants.length > 0) return product.variants;
+  return [
+    {
+      id: `legacy-${product.id}`,
+      productId: product.id,
+      name: "Базовый цвет",
+      sku: product.sku,
+      price: null,
+      imageUrl: product.imageUrl,
+      imagesJson: product.imagesJson,
+      isDefault: true,
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt,
+      sizes: product.sizes.map((size) => ({
+        id: size.id,
+        variantId: `legacy-${product.id}`,
+        label: size.label,
+        stock: size.stock,
+      })),
+    },
+  ];
+}
 
 /** Приводит товар к виду для API: images[] (вместо imagesJson) + сортировка размеров + суммарный остаток. */
-export function serializeProduct(product: ProductWithSizes) {
+export function serializeProduct(product: ProductWithRelations) {
   const { imagesJson: _imagesJson, ...rest } = product;
-  const sizes = sortSizes(product.sizes);
+  const variants = normalizeVariants(product).map((variant) => {
+    const sizes = sortSizes(variant.sizes);
+    const images = parseImagesFromRaw(variant.imagesJson, variant.imageUrl);
+    return {
+      ...variant,
+      sizes,
+      images,
+      totalStock: sizes.reduce((sum, s) => sum + s.stock, 0),
+    };
+  });
+  const defaultVariant = variants.find((variant) => variant.isDefault) ?? variants[0];
+  const sizes = defaultVariant ? defaultVariant.sizes : sortSizes(product.sizes);
+  const images = defaultVariant
+    ? defaultVariant.images
+    : parseImagesFromRaw(product.imagesJson, product.imageUrl);
+  const effectivePrice = defaultVariant?.price ?? product.price;
   return {
     ...rest,
-    images: parseImages(product),
+    price: effectivePrice,
+    images,
+    imageUrl: images[0] ?? rest.imageUrl,
     sizes,
+    variants,
+    defaultVariantId: defaultVariant?.id ?? null,
     totalStock: sizes.reduce((sum, s) => sum + s.stock, 0),
   };
 }
@@ -44,7 +91,7 @@ export function serializeProduct(product: ProductWithSizes) {
 export async function listProducts() {
   const products = await prisma.product.findMany({
     where: { isActive: true },
-    include: { sizes: true },
+    include: { sizes: true, variants: { include: { sizes: true }, orderBy: { createdAt: "asc" } } },
     orderBy: [{ position: "asc" }, { createdAt: "desc" }],
   });
   return products.map(serializeProduct);
@@ -53,7 +100,7 @@ export async function listProducts() {
 export async function getProductById(id: string) {
   const product = await prisma.product.findUnique({
     where: { id },
-    include: { sizes: true },
+    include: { sizes: true, variants: { include: { sizes: true }, orderBy: { createdAt: "asc" } } },
   });
   if (!product || !product.isActive) throw notFound("Товар не найден");
   return serializeProduct(product);

@@ -43,6 +43,7 @@ export const createOrderSchema = z
       .array(
         z.object({
           productId: z.string().min(1),
+          variantId: z.string().min(1).optional(),
           sizeLabel: z.enum(SIZES),
           quantity: z.number().int().min(1).max(99),
         }),
@@ -103,6 +104,15 @@ const productImagesSchema = z
   .array(z.string().trim().min(1).max(1000))
   .max(20, "Слишком много изображений");
 
+const productVariantSchema = z.object({
+  id: z.string().trim().min(1).optional(),
+  name: z.string().trim().min(1, "Укажите название цвета").max(80),
+  sku: z.string().trim().min(1, "Укажите артикул варианта").max(80),
+  price: z.number().int("Цена должна быть целым числом").min(1).optional().nullable(),
+  images: productImagesSchema.optional(),
+  sizes: z.array(sizeStockSchema).max(SIZES.length),
+});
+
 export const createProductSchema = z.object({
   name: z.string().trim().min(1, "Укажите название"),
   description: z.string().trim().max(4000).optional().nullable(),
@@ -114,6 +124,7 @@ export const createProductSchema = z.object({
   sizeChartUrl: z.string().trim().min(1).max(1000).optional().nullable(),
   isActive: z.boolean().optional(),
   sizes: z.array(sizeStockSchema).max(SIZES.length).optional(),
+  variants: z.array(productVariantSchema).min(1, "Добавьте хотя бы один цвет").optional(),
 });
 
 export type CreateProductBody = z.infer<typeof createProductSchema>;
@@ -123,6 +134,7 @@ export type UpdateProductBody = z.infer<typeof updateProductSchema>;
 
 // Изменение остатка: delta (может быть отрицательной для прямого вычитания).
 export const stockAdjustSchema = z.object({
+  variantId: z.string().trim().min(1).optional(),
   label: z.enum(SIZES),
   delta: z.number().int("Значение должно быть целым числом"),
 });

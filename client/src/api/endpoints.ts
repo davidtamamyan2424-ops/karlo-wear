@@ -96,6 +96,14 @@ export interface ProductPayload {
   sizeChartUrl?: string | null;
   isActive?: boolean;
   sizes?: { label: ProductBadgeSize; stock: number }[];
+  variants?: {
+    id?: string;
+    name: string;
+    sku: string;
+    price?: number | null;
+    images?: string[];
+    sizes: { label: ProductBadgeSize; stock: number }[];
+  }[];
 }
 
 type ProductBadgeSize = "S" | "M" | "L" | "XL";
@@ -133,10 +141,11 @@ export function adminAdjustStock(
   id: string,
   label: ProductBadgeSize,
   delta: number,
+  variantId?: string,
 ): Promise<Product> {
   return apiRequest<Product>(`/admin/products/${id}/stock`, {
     method: "POST",
-    body: { label, delta },
+    body: { label, delta, variantId },
     adminToken: token,
   });
 }
@@ -152,6 +161,13 @@ export function adminReorderProducts(token: string, ids: string[]): Promise<Prod
   return apiRequest<Product[]>("/admin/products/reorder", {
     method: "POST",
     body: { ids },
+    adminToken: token,
+  });
+}
+
+export function adminDeleteProduct(token: string, id: string): Promise<void> {
+  return apiRequest<void>(`/admin/products/${id}`, {
+    method: "DELETE",
     adminToken: token,
   });
 }
