@@ -8,13 +8,14 @@ import AdminProducts from "./AdminProducts";
 const TOKEN_KEY = "karlo-wear-admin-token";
 
 type Tab = "orders" | "products" | "accounts";
+type TabWithArchive = Tab | "archive";
 
 export default function AdminPage() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
   const [input, setInput] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
-  const [tab, setTab] = useState<Tab>("orders");
+  const [tab, setTab] = useState<TabWithArchive>("orders");
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -81,8 +82,9 @@ export default function AdminPage() {
           [
             ["orders", ru.admin.tabs.orders],
             ["products", ru.admin.tabs.products],
+            ["archive", ru.admin.tabs.archive],
             ["accounts", ru.admin.tabs.paymentAccounts],
-          ] as [Tab, string][]
+          ] as [TabWithArchive, string][]
         ).map(([key, label]) => (
           <button
             key={key}
@@ -99,7 +101,8 @@ export default function AdminPage() {
       </div>
 
       {tab === "orders" && <AdminOrders token={token} />}
-      {tab === "products" && <AdminProducts token={token} />}
+      {tab === "products" && <AdminProducts token={token} archived={false} />}
+      {tab === "archive" && <AdminProducts token={token} archived />}
       {tab === "accounts" && <AdminPaymentAccounts token={token} />}
     </div>
   );

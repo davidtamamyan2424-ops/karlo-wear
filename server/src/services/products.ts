@@ -90,7 +90,7 @@ export function serializeProduct(product: ProductWithRelations) {
 
 export async function listProducts() {
   const products = await prisma.product.findMany({
-    where: { isActive: true },
+    where: { isActive: true, archived: false },
     include: { sizes: true, variants: { include: { sizes: true }, orderBy: { createdAt: "asc" } } },
     orderBy: [{ position: "asc" }, { createdAt: "desc" }],
   });
@@ -102,6 +102,6 @@ export async function getProductById(id: string) {
     where: { id },
     include: { sizes: true, variants: { include: { sizes: true }, orderBy: { createdAt: "asc" } } },
   });
-  if (!product || !product.isActive) throw notFound("Товар не найден");
+  if (!product || !product.isActive || product.archived) throw notFound("Товар не найден");
   return serializeProduct(product);
 }

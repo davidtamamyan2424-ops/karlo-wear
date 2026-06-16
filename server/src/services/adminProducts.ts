@@ -47,11 +47,24 @@ export async function generateProductSku(): Promise<string> {
 
 export async function listAdminProducts() {
   const products = await prisma.product.findMany({
+    where: { archived: false },
     include: {
       sizes: true,
       variants: { include: { sizes: true }, orderBy: { createdAt: "asc" } },
     },
     orderBy: [{ position: "asc" }, { createdAt: "desc" }],
+  });
+  return products.map(serializeProduct);
+}
+
+export async function listArchivedProducts() {
+  const products = await prisma.product.findMany({
+    where: { archived: true },
+    include: {
+      sizes: true,
+      variants: { include: { sizes: true }, orderBy: { createdAt: "asc" } },
+    },
+    orderBy: [{ updatedAt: "desc" }],
   });
   return products.map(serializeProduct);
 }
@@ -116,6 +129,7 @@ export async function createProduct(input: CreateProductBody) {
         composition: input.composition ?? null,
         badge: input.badge ?? null,
         isActive: input.isActive ?? true,
+        archived: false,
         imagesJson: imageCols.imagesJson,
         imageUrl: imageCols.imageUrl,
         sizeChartUrl: input.sizeChartUrl ?? null,
@@ -388,5 +402,17 @@ export async function adjustStock(id: string, label: string, delta: number, vari
 }
 
 export async function deleteProduct(id: string) {
+  await prisma.product.update({ where: { id }, data: { archived: true } });
+}
+
+export async function restoreProduct(id: string) {
+  await prisma.product.update({ where: { id }, data: { archived: false } });
+}
+
+export async function permanentlyDeleteProduct(id: string) {
+  const usedInOrders = await prisma.orderItem.count({ where: { productId: id } });
+  if (usedInOrders > 0) {
+    throw conflict("Товар участвовал в заказах и не может быть удалён окончательно.");
+  }
   await prisma.product.delete({ where: { id } });
 }

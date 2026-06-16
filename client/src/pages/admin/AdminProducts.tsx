@@ -7,8 +7,11 @@ import { formatPrice } from "../../lib/format";
 import {
   adminDeleteProduct,
   adminDuplicateProduct,
+  adminFetchArchivedProducts,
   adminFetchProducts,
+  adminPermanentDeleteProduct,
   adminReorderProducts,
+  adminRestoreProduct,
   adminUpdateProduct,
 } from "../../api/endpoints";
 import AdminProductForm from "./AdminProductForm";
@@ -20,7 +23,7 @@ function imgSrc(url: string | null): string | null {
   return url.startsWith("http") ? url : fileUrl(url);
 }
 
-export default function AdminProducts({ token }: { token: string }) {
+export default function AdminProducts({ token, archived = false }: { token: string; archived?: boolean }) {
   const [products, setProducts] = useState<Product[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<{ product: Product | null } | null>(null);
@@ -30,12 +33,13 @@ export default function AdminProducts({ token }: { token: string }) {
 
   const load = () => {
     setError(null);
-    adminFetchProducts(token)
+    const loader = archived ? adminFetchArchivedProducts : adminFetchProducts;
+    loader(token)
       .then(setProducts)
       .catch(() => setError(ru.common.error));
   };
 
-  useEffect(load, [token]);
+  useEffect(load, [token, archived]);
 
   const upsert = (product: Product) =>
     setProducts((prev) => {
@@ -80,6 +84,38 @@ export default function AdminProducts({ token }: { token: string }) {
       setProducts((prev) => (prev ?? []).filter((item) => item.id !== product.id));
     } catch {
       setError(t.saveError);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const restore = async (product: Product) => {
+    setBusyId(product.id);
+    setError(null);
+    try {
+      await adminRestoreProduct(token, product.id);
+      setProducts((prev) => (prev ?? []).filter((item) => item.id !== product.id));
+    } catch {
+      setError(t.saveError);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const permanentDelete = async (product: Product) => {
+    if (!window.confirm(t.permanentDeleteConfirm)) return;
+    setBusyId(product.id);
+    setError(null);
+    try {
+      await adminPermanentDeleteProduct(token, product.id);
+      setProducts((prev) => (prev ?? []).filter((item) => item.id !== product.id));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t.saveError;
+      setError(
+        message.includes("не может быть удалён окончательно")
+          ? t.permanentDeleteForbidden
+          : message,
+      );
     } finally {
       setBusyId(null);
     }
@@ -149,7 +185,7 @@ export default function AdminProducts({ token }: { token: string }) {
         <p className="text-sm text-tg-hint">{t.empty}</p>
       )}
 
-      {products && products.length > 1 && (
+      {products && products.length > 1 && !archived && (
         <p className="text-xs text-tg-hint">{t.reorderHint}</p>
       )}
 
@@ -161,10 +197,10 @@ export default function AdminProducts({ token }: { token: string }) {
             <li
               key={product.id}
               draggable
-              onDragStart={() => setDragId(product.id)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => onDrop(product.id)}
-              onDragEnd={() => setDragId(null)}
+              onDragStart={() => !archived && setDragId(product.id)}
+              onDragOver={(e) => !archived && e.preventDefault()}
+              onDrop={() => !archived && onDrop(product.id)}
+              onDragEnd={() => !archived && setDragId(null)}
               className={`flex gap-3 rounded-2xl border bg-white p-3 transition ${
                 dragId === product.id
                   ? "border-tg-button opacity-60"
@@ -175,7 +211,7 @@ export default function AdminProducts({ token }: { token: string }) {
                 <button
                   type="button"
                   onClick={() => reorder(index, index - 1)}
-                  disabled={index === 0}
+                  disabled={archived || index === 0}
                   aria-label={t.moveUp}
                   className="flex h-6 w-6 items-center justify-center rounded-md bg-tg-secondaryBg text-tg-hint disabled:opacity-30"
                 >
@@ -193,7 +229,7 @@ export default function AdminProducts({ token }: { token: string }) {
                 <button
                   type="button"
                   onClick={() => reorder(index, index + 1)}
-                  disabled={index === (products?.length ?? 0) - 1}
+                  disabled={archived || index === (products?.length ?? 0) - 1}
                   aria-label={t.moveDown}
                   className="flex h-6 w-6 items-center justify-center rounded-md bg-tg-secondaryBg text-tg-hint disabled:opacity-30"
                 >
@@ -232,36 +268,59 @@ export default function AdminProducts({ token }: { token: string }) {
                 )}
 
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setForm({ product })}
-                    className="rounded-lg bg-tg-secondaryBg px-3 py-1.5 text-xs font-medium"
-                  >
-                    {t.edit}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busyId === product.id}
-                    onClick={() => void duplicate(product)}
-                    className="rounded-lg bg-tg-secondaryBg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-                  >
-                    {t.duplicate}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busyId === product.id}
-                    onClick={() => void removeProduct(product)}
-                    className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 disabled:opacity-50"
-                  >
-                    {t.delete}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void toggleStatus(product)}
-                    className="rounded-lg bg-tg-secondaryBg px-3 py-1.5 text-xs font-medium"
-                  >
-                    {product.isActive ? t.hide : t.publish}
-                  </button>
+                  {!archived ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setForm({ product })}
+                        className="rounded-lg bg-tg-secondaryBg px-3 py-1.5 text-xs font-medium"
+                      >
+                        {t.edit}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyId === product.id}
+                        onClick={() => void duplicate(product)}
+                        className="rounded-lg bg-tg-secondaryBg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                      >
+                        {t.duplicate}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyId === product.id}
+                        onClick={() => void removeProduct(product)}
+                        className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 disabled:opacity-50"
+                      >
+                        {t.delete}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void toggleStatus(product)}
+                        className="rounded-lg bg-tg-secondaryBg px-3 py-1.5 text-xs font-medium"
+                      >
+                        {product.isActive ? t.hide : t.publish}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        disabled={busyId === product.id}
+                        onClick={() => void restore(product)}
+                        className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-medium text-emerald-800 disabled:opacity-50"
+                      >
+                        {t.restore}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyId === product.id}
+                        onClick={() => void permanentDelete(product)}
+                        className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 disabled:opacity-50"
+                      >
+                        {t.permanentDelete}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </li>

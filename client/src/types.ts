@@ -46,6 +46,7 @@ export interface Product {
   modelHeight: number | null;
   modelSize: string | null;
   isActive: boolean;
+  archived?: boolean;
   sizes: ProductSize[];
   variants: ProductVariant[];
   defaultVariantId?: string | null;

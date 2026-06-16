@@ -112,6 +112,10 @@ export function adminFetchProducts(token: string): Promise<Product[]> {
   return apiRequest<Product[]>("/admin/products", { adminToken: token });
 }
 
+export function adminFetchArchivedProducts(token: string): Promise<Product[]> {
+  return apiRequest<Product[]>("/admin/products/archive", { adminToken: token });
+}
+
 export function adminFetchProduct(token: string, id: string): Promise<Product> {
   return apiRequest<Product>(`/admin/products/${id}`, { adminToken: token });
 }
@@ -167,6 +171,20 @@ export function adminReorderProducts(token: string, ids: string[]): Promise<Prod
 
 export function adminDeleteProduct(token: string, id: string): Promise<void> {
   return apiRequest<void>(`/admin/products/${id}`, {
+    method: "DELETE",
+    adminToken: token,
+  });
+}
+
+export function adminRestoreProduct(token: string, id: string): Promise<void> {
+  return apiRequest<void>(`/admin/products/${id}/restore`, {
+    method: "POST",
+    adminToken: token,
+  });
+}
+
+export function adminPermanentDeleteProduct(token: string, id: string): Promise<void> {
+  return apiRequest<void>(`/admin/products/${id}/permanent`, {
     method: "DELETE",
     adminToken: token,
   });

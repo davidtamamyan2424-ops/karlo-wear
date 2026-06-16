@@ -24,8 +24,11 @@ import {
   deleteProduct,
   duplicateProduct,
   getAdminProduct,
+  listArchivedProducts,
   listAdminProducts,
+  permanentlyDeleteProduct,
   reorderProducts,
+  restoreProduct,
   updateProduct,
 } from "../services/adminProducts.js";
 import { uploadProductImages, uploadSizeChart } from "../lib/upload.js";
@@ -95,6 +98,13 @@ adminRouter.get(
 );
 
 adminRouter.get(
+  "/products/archive",
+  asyncHandler(async (_req, res) => {
+    res.json(await listArchivedProducts());
+  }),
+);
+
+adminRouter.get(
   "/products/:id",
   asyncHandler(async (req, res) => {
     res.json(await getAdminProduct(req.params.id));
@@ -146,6 +156,22 @@ adminRouter.delete(
   "/products/:id",
   asyncHandler(async (req, res) => {
     await deleteProduct(req.params.id);
+    res.status(204).send();
+  }),
+);
+
+adminRouter.post(
+  "/products/:id/restore",
+  asyncHandler(async (req, res) => {
+    await restoreProduct(req.params.id);
+    res.status(204).send();
+  }),
+);
+
+adminRouter.delete(
+  "/products/:id/permanent",
+  asyncHandler(async (req, res) => {
+    await permanentlyDeleteProduct(req.params.id);
     res.status(204).send();
   }),
 );

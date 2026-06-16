@@ -30,6 +30,7 @@ model Product {
   modelHeight Int? // Рост модели, см
   modelSize   String? // Размер на модели: S | M | L | XL
   isActive    Boolean       @default(true)
+  archived    Boolean       @default(false)
   // Позиция в каталоге (управляется администратором, сортировка по возрастанию).
   position    Int           @default(0)
   sizes       ProductSize[]

@@ -17,14 +17,14 @@ export default {
       },
       colors: {
         // Премиальная нейтральная палитра витрины
-        paper: "#ffffff",
+        paper: "#FAF8F5",
         ink: "#0b0b0c",
         muted: "#6b6b70",
         line: "#ededec",
         surface: "#f6f6f5",
         // Telegram theme params (для отдельных элементов)
         tg: {
-          bg: "var(--tg-theme-bg-color, #ffffff)",
+          bg: "var(--tg-theme-bg-color, #FAF8F5)",
           text: "var(--tg-theme-text-color, #0b0b0c)",
           hint: "var(--tg-theme-hint-color, #6b6b70)",
           link: "var(--tg-theme-link-color, #2481cc)",
