@@ -30,7 +30,6 @@ type VariantForm = {
   id?: string;
   name: string;
   sku: string;
-  colorHex: string;
   priceRub: string;
   images: string[];
   stock: Record<Size, number>;
@@ -65,7 +64,6 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
           id: variant.id,
           name: variant.name,
           sku: variant.sku,
-          colorHex: variant.colorHex ?? "",
           priceRub: variant.price ? String(Math.round(variant.price / 100)) : "",
           images: variant.images,
           stock: makeStock(variant.sizes),
@@ -75,7 +73,6 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
           {
             name: "Базовый цвет",
             sku: product?.sku ?? randomVariantSku(),
-            colorHex: "",
             priceRub: "",
             images: product?.images ?? [],
             stock: makeStock(product?.sizes),
@@ -237,7 +234,6 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
         id: variant.id,
         name: variant.name.trim(),
         sku: variant.sku.trim(),
-        colorHex: variant.colorHex.trim() || null,
         price: variant.priceRub.trim() ? Math.round(Number(variant.priceRub) * 100) : null,
         images: variant.images,
         sizes: SIZES.map((label) => ({ label, stock: variant.stock[label] })),
@@ -346,7 +342,6 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
                 {
                   name: "",
                   sku: randomVariantSku(),
-                  colorHex: "",
                   priceRub: "",
                   images: [],
                   stock: { S: 0, M: 0, L: 0, XL: 0 },
@@ -367,11 +362,7 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
               onClick={() => setActiveVariantIdx(idx)}
               className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium ${idx === activeVariantIdx ? "bg-ink text-white" : "bg-tg-secondaryBg"}`}
             >
-              <ColorSwatch
-                name={variant.name || `Цвет ${idx + 1}`}
-                colorHex={variant.colorHex || null}
-                size={12}
-              />
+              <ColorSwatch name={variant.name || `Цвет ${idx + 1}`} size={12} />
               {variant.name || `Цвет ${idx + 1}`}
             </button>
           ))}
@@ -515,7 +506,7 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
         <label className="block">
           <span className="mb-1 block text-xs font-medium">{t.colorName} *</span>
           <div className="flex items-center gap-2">
-            <ColorSwatch name={activeVariant.name} colorHex={activeVariant.colorHex || null} size={24} />
+            <ColorSwatch name={activeVariant.name} size={24} />
             <input
               value={activeVariant.name}
               onChange={(e) =>
@@ -528,21 +519,6 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
               className={`${inputCls} flex-1`}
             />
           </div>
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium">{t.colorHex}</span>
-          <input
-            value={activeVariant.colorHex}
-            onChange={(e) =>
-              setVariants((prev) =>
-                prev.map((variant, idx) =>
-                  idx === activeVariantIdx ? { ...variant, colorHex: e.target.value } : variant,
-                ),
-              )
-            }
-            placeholder="#000000"
-            className={inputCls}
-          />
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-medium">{t.variantSku} *</span>

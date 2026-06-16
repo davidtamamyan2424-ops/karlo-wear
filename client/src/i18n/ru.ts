@@ -37,6 +37,10 @@ export const ru = {
     goToCart: "Перейти в корзину",
     sizeChart: "Размерная сетка",
     close: "Закрыть",
+    photoPlaceholder: {
+      title: "Фото этого цвета скоро появятся",
+      subtitle: "Мы готовим фотографии этой модели\nв выбранном цвете.",
+    },
   },
   cart: {
     title: "Корзина",
@@ -250,7 +254,6 @@ export const ru = {
       variants: "Варианты цветов",
       addVariant: "Добавить цвет",
       colorName: "Название цвета",
-      colorHex: "Код цвета",
       moveVariantUp: "← Раньше",
       moveVariantDown: "Позже →",
       variantSku: "SKU варианта",

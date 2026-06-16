@@ -359,7 +359,7 @@ export async function duplicateProduct(id: string) {
 
     const product = await prisma.product.create({
       data: {
-        name: source.name,
+        name: `${source.name} (копия)`,
         sku,
         position,
         description: source.description,

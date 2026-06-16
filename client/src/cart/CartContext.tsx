@@ -97,7 +97,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           variantName: variant.name,
           sku: variant.sku,
           name: product.name,
-          imageUrl: variant.imageUrl ?? product.imageUrl,
+          imageUrl: variant.images[0] ?? variant.imageUrl ?? null,
           price: variant.price ?? product.price,
           size,
           quantity: next,

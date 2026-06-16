@@ -9,6 +9,7 @@ import { useToast } from "./Toast";
 import { hapticImpact, hapticNotify, hapticSelection } from "../telegram/webapp";
 import ImageGallery from "./ImageGallery";
 import ColorSwatch from "./ColorSwatch";
+import VariantImagePlaceholder from "./VariantImagePlaceholder";
 
 interface Props {
   item: CatalogItem;
@@ -26,7 +27,7 @@ export default function ProductCard({ item, showColor = true }: Props) {
   const [flash, setFlash] = useState(false);
 
   const variantPrice = variant.price ?? product.price;
-  const variantImages = variant.images.length > 0 ? variant.images : product.images;
+  const hasImages = variant.images.length > 0;
 
   const open = () =>
     navigate(`/product/${product.id}?variant=${encodeURIComponent(variant.id)}`);
@@ -63,7 +64,11 @@ export default function ProductCard({ item, showColor = true }: Props) {
   return (
     <div className="group flex flex-col rounded-card bg-card p-2 shadow-card">
       <div className="relative">
-        <ImageGallery images={variantImages} alt={product.name} onTap={open} aspect="4/5" />
+        {hasImages ? (
+          <ImageGallery images={variant.images} alt={product.name} onTap={open} aspect="4/5" />
+        ) : (
+          <VariantImagePlaceholder aspect="4/5" onTap={open} />
+        )}
         {badgeLabel && (
           <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-ink shadow-card backdrop-blur">
             {badgeLabel}
@@ -82,7 +87,7 @@ export default function ProductCard({ item, showColor = true }: Props) {
 
         {showColor && (
           <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
-            <ColorSwatch name={variant.name} colorHex={variant.colorHex} size={12} />
+            <ColorSwatch name={variant.name} size={12} />
             <span>{variant.name}</span>
           </p>
         )}

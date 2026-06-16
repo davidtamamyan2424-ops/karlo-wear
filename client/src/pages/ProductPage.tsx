@@ -11,6 +11,7 @@ import { hapticImpact, hapticNotify, hapticSelection } from "../telegram/webapp"
 import ImageGallery from "../components/ImageGallery";
 import SizeChartModal from "../components/SizeChartModal";
 import ColorSwatch from "../components/ColorSwatch";
+import VariantImagePlaceholder from "../components/VariantImagePlaceholder";
 
 export default function ProductPage() {
   const { id } = useParams<{ id: string }>();
@@ -63,7 +64,9 @@ export default function ProductPage() {
 
   const selectedVariant =
     product.variants.find((variant) => variant.id === selectedVariantId) ?? product.variants[0];
-  const variantSizes = selectedVariant?.sizes ?? product.sizes;
+  const variantSizes = selectedVariant?.sizes ?? [];
+  const variantImages = selectedVariant?.images ?? [];
+  const hasVariantImages = variantImages.length > 0;
   const selectedStock = selectedSize
     ? (variantSizes.find((s) => s.label === selectedSize)?.stock ?? 0)
     : null;
@@ -98,12 +101,11 @@ export default function ProductPage() {
 
   return (
     <div className="animate-fade-in space-y-5">
-      <ImageGallery
-        images={selectedVariant?.images?.length ? selectedVariant.images : product.images}
-        alt={product.name}
-        aspect="3/4"
-        eagerFirst
-      />
+      {hasVariantImages ? (
+        <ImageGallery images={variantImages} alt={product.name} aspect="3/4" eagerFirst />
+      ) : (
+        <VariantImagePlaceholder aspect="3/4" />
+      )}
 
       <div>
         <h1 className="text-xl font-semibold tracking-tight text-ink">{product.name}</h1>
@@ -133,12 +135,7 @@ export default function ProductPage() {
                     active ? "bg-ink text-white" : "bg-surface text-ink hover:bg-line",
                   ].join(" ")}
                 >
-                  <ColorSwatch
-                    name={variant.name}
-                    colorHex={variant.colorHex}
-                    size={16}
-                    className={active ? "ring-white/40" : ""}
-                  />
+                  <ColorSwatch name={variant.name} size={16} className={active ? "ring-white/40" : ""} />
                   {variant.name}
                 </button>
               );

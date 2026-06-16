@@ -29,17 +29,15 @@ function inferColorFromName(name: string): string {
 
 interface Props {
   name: string;
-  colorHex?: string | null;
   size?: number;
   className?: string;
 }
 
-export default function ColorSwatch({ name, colorHex, size = 14, className = "" }: Props) {
-  const bg = colorHex?.trim() || inferColorFromName(name);
+export default function ColorSwatch({ name, size = 14, className = "" }: Props) {
   return (
     <span
       className={`inline-block shrink-0 rounded-full ring-1 ring-inset ring-black/10 ${className}`}
-      style={{ width: size, height: size, backgroundColor: bg }}
+      style={{ width: size, height: size, backgroundColor: inferColorFromName(name) }}
       aria-hidden
     />
   );
