@@ -45,12 +45,26 @@ export async function generateProductSku(): Promise<string> {
   throw conflict("Не удалось сгенерировать артикул");
 }
 
+/** Генерирует уникальный артикул варианта (KW-V-XXXXXXXX). */
+export async function generateVariantSku(): Promise<string> {
+  for (let i = 0; i < 100; i++) {
+    const suffix = crypto.randomBytes(4).toString("hex").toUpperCase();
+    const candidate = `KW-V-${suffix}`;
+    const exists = await prisma.productVariant.findUnique({
+      where: { sku: candidate },
+      select: { id: true },
+    });
+    if (!exists) return candidate;
+  }
+  throw conflict("Не удалось сгенерировать артикул варианта");
+}
+
 export async function listAdminProducts() {
   const products = await prisma.product.findMany({
     where: { archived: false },
     include: {
       sizes: true,
-      variants: { include: { sizes: true }, orderBy: { createdAt: "asc" } },
+      variants: { include: { sizes: true }, orderBy: { position: "asc" } },
     },
     orderBy: [{ position: "asc" }, { createdAt: "desc" }],
   });
@@ -62,7 +76,7 @@ export async function listArchivedProducts() {
     where: { archived: true },
     include: {
       sizes: true,
-      variants: { include: { sizes: true }, orderBy: { createdAt: "asc" } },
+      variants: { include: { sizes: true }, orderBy: { position: "asc" } },
     },
     orderBy: [{ updatedAt: "desc" }],
   });
@@ -84,7 +98,7 @@ export async function getAdminProduct(id: string) {
     where: { id },
     include: {
       sizes: true,
-      variants: { include: { sizes: true }, orderBy: { createdAt: "asc" } },
+      variants: { include: { sizes: true }, orderBy: { position: "asc" } },
     },
   });
   if (!product) throw notFound("Товар не найден");
@@ -143,9 +157,11 @@ export async function createProduct(input: CreateProductBody) {
             return {
               name: variant.name,
               sku: variant.sku,
+              colorHex: variant.colorHex ?? null,
               price: variant.price ?? null,
               imageUrl: imageCols.imageUrl,
               imagesJson: imageCols.imagesJson,
+              position: index,
               isDefault: index === 0,
               sizes: {
                 create: SIZES.map((label) => {
@@ -223,9 +239,11 @@ export async function updateProduct(id: string, input: UpdateProductBody) {
               data: {
                 name: variant.name,
                 sku: variant.sku,
+                colorHex: variant.colorHex ?? null,
                 price: variant.price ?? null,
                 imageUrl: imageCols.imageUrl,
                 imagesJson: imageCols.imagesJson,
+                position: i,
                 isDefault: i === 0,
               },
             });
@@ -235,9 +253,11 @@ export async function updateProduct(id: string, input: UpdateProductBody) {
                 productId: id,
                 name: variant.name,
                 sku: variant.sku,
+                colorHex: variant.colorHex ?? null,
                 price: variant.price ?? null,
                 imageUrl: imageCols.imageUrl,
                 imagesJson: imageCols.imagesJson,
+                position: i,
                 isDefault: i === 0,
               },
             });
@@ -247,7 +267,7 @@ export async function updateProduct(id: string, input: UpdateProductBody) {
         const variants = await tx.productVariant.findMany({
           where: { productId: id },
           include: { sizes: true },
-          orderBy: { createdAt: "asc" },
+          orderBy: { position: "asc" },
         });
         const newVariantPayloads = variantInputs.filter((v) => !v.id);
         for (const variant of variants) {
@@ -293,9 +313,30 @@ export async function updateProduct(id: string, input: UpdateProductBody) {
 export async function duplicateProduct(id: string) {
   const source = await prisma.product.findUnique({
     where: { id },
-    include: { sizes: true, variants: { include: { sizes: true }, orderBy: { createdAt: "asc" } } },
+    include: { sizes: true, variants: { include: { sizes: true }, orderBy: { position: "asc" } } },
   });
   if (!source) throw notFound("Товар не найден");
+
+  const sourceVariants =
+    source.variants.length > 0
+      ? source.variants
+      : [
+          {
+            id: "legacy",
+            productId: source.id,
+            name: "Базовый цвет",
+            sku: source.sku,
+            colorHex: null,
+            price: null,
+            imageUrl: source.imageUrl,
+            imagesJson: source.imagesJson,
+            position: 0,
+            isDefault: true,
+            createdAt: source.createdAt,
+            updatedAt: source.updatedAt,
+            sizes: source.sizes,
+          },
+        ];
 
   const images: string[] = source.imagesJson ? JSON.parse(source.imagesJson) : [];
   const imageCols = imagesToColumns(images.length > 0 ? images : undefined) ?? {
@@ -303,53 +344,73 @@ export async function duplicateProduct(id: string) {
     imageUrl: source.imageUrl,
   };
 
-  const sku = await generateProductSku();
+  const defaultSourceVariant = sourceVariants.find((v) => v.isDefault) ?? sourceVariants[0];
+  const defaultSizes = defaultSourceVariant.sizes;
 
-  const last = await prisma.product.findFirst({
-    orderBy: { position: "desc" },
-    select: { position: true },
-  });
-  const position = (last?.position ?? -1) + 1;
+  try {
+    const sku = await generateProductSku();
+    const variantSkus = await Promise.all(sourceVariants.map(() => generateVariantSku()));
 
-  const product = await prisma.product.create({
-    data: {
-      name: source.name,
-      sku,
-      position,
-      description: source.description,
-      price: source.price,
-      currency: source.currency,
-      imageUrl: imageCols.imageUrl ?? null,
-      imagesJson: imageCols.imagesJson ?? null,
-      sizeChartUrl: source.sizeChartUrl,
-      category: source.category,
-      badge: source.badge,
-      composition: source.composition,
-      fabricDensity: source.fabricDensity,
-      modelHeight: source.modelHeight,
-      modelSize: source.modelSize,
-      isActive: source.isActive,
-      sizes: {
-        create: SIZES.map((label) => ({ label, stock: 0 })),
+    const last = await prisma.product.findFirst({
+      orderBy: { position: "desc" },
+      select: { position: true },
+    });
+    const position = (last?.position ?? -1) + 1;
+
+    const product = await prisma.product.create({
+      data: {
+        name: source.name,
+        sku,
+        position,
+        description: source.description,
+        price: source.price,
+        currency: source.currency,
+        imageUrl: imageCols.imageUrl ?? null,
+        imagesJson: imageCols.imagesJson ?? null,
+        sizeChartUrl: source.sizeChartUrl,
+        category: source.category,
+        badge: source.badge,
+        composition: source.composition,
+        fabricDensity: source.fabricDensity,
+        modelHeight: source.modelHeight,
+        modelSize: source.modelSize,
+        isActive: source.isActive,
+        archived: false,
+        sizes: {
+          create: SIZES.map((label) => {
+            const size = defaultSizes.find((s) => s.label === label);
+            return { label, stock: size?.stock ?? 0 };
+          }),
+        },
+        variants: {
+          create: sourceVariants.map((variant, index) => ({
+            name: variant.name,
+            sku: variantSkus[index],
+            colorHex: variant.colorHex,
+            price: variant.price,
+            imageUrl: variant.imageUrl,
+            imagesJson: variant.imagesJson,
+            position: index,
+            isDefault: index === 0,
+            sizes: {
+              create: SIZES.map((label) => {
+                const size = variant.sizes.find((s) => s.label === label);
+                return { label, stock: size?.stock ?? 0 };
+              }),
+            },
+          })),
+        },
       },
-      variants: {
-        create: source.variants.map((variant, index) => ({
-          name: variant.name,
-          sku: `${variant.sku}-COPY-${index + 1}`,
-          price: variant.price,
-          imageUrl: variant.imageUrl,
-          imagesJson: variant.imagesJson,
-          isDefault: variant.isDefault,
-          sizes: {
-            create: SIZES.map((label) => ({ label, stock: 0 })),
-          },
-        })),
-      },
-    },
-    include: { sizes: true, variants: { include: { sizes: true } } },
-  });
+      include: { sizes: true, variants: { include: { sizes: true }, orderBy: { position: "asc" } } },
+    });
 
-  return serializeProduct(product);
+    return serializeProduct(product);
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      throw conflict("Не удалось дублировать товар. Попробуйте ещё раз.");
+    }
+    throw error;
+  }
 }
 
 /** Изменяет остаток по размеру на delta. Результат не может быть отрицательным. */

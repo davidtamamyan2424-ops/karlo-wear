@@ -11,6 +11,7 @@ import {
   adminUploadSizeChart,
   type ProductPayload,
 } from "../../api/endpoints";
+import ColorSwatch from "../../components/ColorSwatch";
 
 const t = ru.admin.products;
 
@@ -29,11 +30,16 @@ type VariantForm = {
   id?: string;
   name: string;
   sku: string;
+  colorHex: string;
   priceRub: string;
   images: string[];
   stock: Record<Size, number>;
   deltas: Record<Size, string>;
 };
+
+function randomVariantSku(): string {
+  return `KW-V-${Math.random().toString(16).slice(2, 10).toUpperCase()}`;
+}
 
 export default function AdminProductForm({ token, product, onClose, onSaved }: Props) {
   const isEdit = Boolean(product);
@@ -59,6 +65,7 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
           id: variant.id,
           name: variant.name,
           sku: variant.sku,
+          colorHex: variant.colorHex ?? "",
           priceRub: variant.price ? String(Math.round(variant.price / 100)) : "",
           images: variant.images,
           stock: makeStock(variant.sizes),
@@ -67,7 +74,8 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
       : [
           {
             name: "Базовый цвет",
-            sku: product?.sku ?? `KW-${Math.random().toString(16).slice(2, 10).toUpperCase()}`,
+            sku: product?.sku ?? randomVariantSku(),
+            colorHex: "",
             priceRub: "",
             images: product?.images ?? [],
             stock: makeStock(product?.sizes),
@@ -121,6 +129,18 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
   };
 
   const activeVariant = variants[activeVariantIdx];
+
+  const moveVariant = (from: number, to: number) => {
+    if (to < 0 || to >= variants.length || from === to) return;
+    setVariants((prev) => {
+      const next = [...prev];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+    setActiveVariantIdx(to);
+  };
+
   const removeImage = (i: number) =>
     setVariants((prev) =>
       prev.map((variant, idx) =>
@@ -217,6 +237,7 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
         id: variant.id,
         name: variant.name.trim(),
         sku: variant.sku.trim(),
+        colorHex: variant.colorHex.trim() || null,
         price: variant.priceRub.trim() ? Math.round(Number(variant.priceRub) * 100) : null,
         images: variant.images,
         sizes: SIZES.map((label) => ({ label, stock: variant.stock[label] })),
@@ -324,7 +345,8 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
                 ...prev,
                 {
                   name: "",
-                  sku: `${product?.sku ?? "KW"}-${prev.length + 1}`,
+                  sku: randomVariantSku(),
+                  colorHex: "",
                   priceRub: "",
                   images: [],
                   stock: { S: 0, M: 0, L: 0, XL: 0 },
@@ -337,18 +359,43 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
             {t.addVariant}
           </button>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {variants.map((variant, idx) => (
             <button
               key={variant.id ?? `new-${idx}`}
               type="button"
               onClick={() => setActiveVariantIdx(idx)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium ${idx === activeVariantIdx ? "bg-ink text-white" : "bg-tg-secondaryBg"}`}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium ${idx === activeVariantIdx ? "bg-ink text-white" : "bg-tg-secondaryBg"}`}
             >
+              <ColorSwatch
+                name={variant.name || `Цвет ${idx + 1}`}
+                colorHex={variant.colorHex || null}
+                size={12}
+              />
               {variant.name || `Цвет ${idx + 1}`}
             </button>
           ))}
         </div>
+        {variants.length > 1 && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={activeVariantIdx === 0}
+              onClick={() => moveVariant(activeVariantIdx, activeVariantIdx - 1)}
+              className="rounded-lg bg-tg-secondaryBg px-3 py-1.5 text-xs font-medium disabled:opacity-40"
+            >
+              {t.moveVariantUp}
+            </button>
+            <button
+              type="button"
+              disabled={activeVariantIdx === variants.length - 1}
+              onClick={() => moveVariant(activeVariantIdx, activeVariantIdx + 1)}
+              className="rounded-lg bg-tg-secondaryBg px-3 py-1.5 text-xs font-medium disabled:opacity-40"
+            >
+              {t.moveVariantDown}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Фото варианта */}
@@ -467,15 +514,33 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
         <span className="text-sm font-medium">{t.sizesStock}</span>
         <label className="block">
           <span className="mb-1 block text-xs font-medium">{t.colorName} *</span>
+          <div className="flex items-center gap-2">
+            <ColorSwatch name={activeVariant.name} colorHex={activeVariant.colorHex || null} size={24} />
+            <input
+              value={activeVariant.name}
+              onChange={(e) =>
+                setVariants((prev) =>
+                  prev.map((variant, idx) =>
+                    idx === activeVariantIdx ? { ...variant, name: e.target.value } : variant,
+                  ),
+                )
+              }
+              className={`${inputCls} flex-1`}
+            />
+          </div>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium">{t.colorHex}</span>
           <input
-            value={activeVariant.name}
+            value={activeVariant.colorHex}
             onChange={(e) =>
               setVariants((prev) =>
                 prev.map((variant, idx) =>
-                  idx === activeVariantIdx ? { ...variant, name: e.target.value } : variant,
+                  idx === activeVariantIdx ? { ...variant, colorHex: e.target.value } : variant,
                 ),
               )
             }
+            placeholder="#000000"
             className={inputCls}
           />
         </label>

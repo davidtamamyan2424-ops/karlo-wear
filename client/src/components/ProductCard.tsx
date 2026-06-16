@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { Product } from "../types";
+import type { CatalogItem } from "../lib/catalog";
 import { PRODUCT_BADGE_LABELS, type ProductBadge, type Size } from "../constants";
 import { ru } from "../i18n/ru";
 import { formatPrice } from "../lib/format";
@@ -8,8 +8,15 @@ import { useCart } from "../cart/CartContext";
 import { useToast } from "./Toast";
 import { hapticImpact, hapticNotify, hapticSelection } from "../telegram/webapp";
 import ImageGallery from "./ImageGallery";
+import ColorSwatch from "./ColorSwatch";
 
-export default function ProductCard({ product }: { product: Product }) {
+interface Props {
+  item: CatalogItem;
+  showColor?: boolean;
+}
+
+export default function ProductCard({ item, showColor = true }: Props) {
+  const { product, variant } = item;
   const navigate = useNavigate();
   const { addItem } = useCart();
   const { show } = useToast();
@@ -18,11 +25,14 @@ export default function ProductCard({ product }: { product: Product }) {
   const [addedSize, setAddedSize] = useState<Size | null>(null);
   const [flash, setFlash] = useState(false);
 
-  const open = () => navigate(`/product/${product.id}`);
+  const variantPrice = variant.price ?? product.price;
+  const variantImages = variant.images.length > 0 ? variant.images : product.images;
+
+  const open = () =>
+    navigate(`/product/${product.id}?variant=${encodeURIComponent(variant.id)}`);
   const badge = product.badge as ProductBadge | null;
   const badgeLabel = badge && PRODUCT_BADGE_LABELS[badge] ? PRODUCT_BADGE_LABELS[badge] : null;
 
-  // Кнопка показывает «Перейти в корзину» только пока выбран тот же размер, что добавлен.
   const inCart = addedSize !== null && addedSize === selectedSize;
 
   const selectSize = (size: Size, disabled: boolean) => {
@@ -37,7 +47,7 @@ export default function ProductCard({ product }: { product: Product }) {
       return;
     }
     if (!selectedSize) return;
-    const ok = addItem(product, selectedSize);
+    const ok = addItem(product, selectedSize, 1, variant.id);
     if (ok) {
       hapticImpact("medium");
       show(ru.notifications.addedToCart, "success");
@@ -51,11 +61,11 @@ export default function ProductCard({ product }: { product: Product }) {
   };
 
   return (
-    <div className="group flex flex-col">
+    <div className="group flex flex-col rounded-card bg-card p-2 shadow-card">
       <div className="relative">
-        <ImageGallery images={product.images} alt={product.name} onTap={open} aspect="4/5" />
+        <ImageGallery images={variantImages} alt={product.name} onTap={open} aspect="4/5" />
         {badgeLabel && (
-          <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-paper/90 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-ink shadow-card backdrop-blur">
+          <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-ink shadow-card backdrop-blur">
             {badgeLabel}
           </span>
         )}
@@ -69,11 +79,18 @@ export default function ProductCard({ product }: { product: Product }) {
         >
           {product.name}
         </button>
-        <p className="mt-1 text-sm font-semibold text-ink">{formatPrice(product.price)}</p>
 
-        {/* Быстрая покупка из каталога */}
+        {showColor && (
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+            <ColorSwatch name={variant.name} colorHex={variant.colorHex} size={12} />
+            <span>{variant.name}</span>
+          </p>
+        )}
+
+        <p className="mt-1 text-sm font-semibold text-ink">{formatPrice(variantPrice)}</p>
+
         <div className="mt-2.5 flex flex-wrap gap-1.5">
-          {product.sizes.map((s) => {
+          {variant.sizes.map((s) => {
             const disabled = s.stock <= 0;
             const active = selectedSize === s.label;
             return (

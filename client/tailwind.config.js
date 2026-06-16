@@ -18,6 +18,7 @@ export default {
       colors: {
         // Премиальная нейтральная палитра витрины
         paper: "#FAF8F5",
+        card: "#FFFFFF",
         ink: "#0b0b0c",
         muted: "#6b6b70",
         line: "#ededec",

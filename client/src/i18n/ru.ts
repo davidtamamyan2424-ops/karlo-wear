@@ -250,6 +250,9 @@ export const ru = {
       variants: "Варианты цветов",
       addVariant: "Добавить цвет",
       colorName: "Название цвета",
+      colorHex: "Код цвета",
+      moveVariantUp: "← Раньше",
+      moveVariantDown: "Позже →",
       variantSku: "SKU варианта",
       variantPrice: "Цена варианта, ₽",
       useBasePrice: "Использовать базовую цену",
@@ -257,7 +260,7 @@ export const ru = {
       // Сообщения
       pieces: "шт.",
       saveError: "Не удалось сохранить товар",
-      duplicateError: "Не удалось дублировать товар",
+      duplicateError: "Не удалось дублировать товар. Попробуйте ещё раз.",
       uploadError: "Не удалось загрузить изображения",
       validationError: "Заполните обязательные поля (название, цена)",
     },

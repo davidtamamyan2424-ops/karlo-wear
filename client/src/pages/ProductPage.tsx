@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { fetchProduct } from "../api/endpoints";
 import type { Product } from "../types";
 import type { Size } from "../constants";
@@ -10,10 +10,13 @@ import { useToast } from "../components/Toast";
 import { hapticImpact, hapticNotify, hapticSelection } from "../telegram/webapp";
 import ImageGallery from "../components/ImageGallery";
 import SizeChartModal from "../components/SizeChartModal";
+import ColorSwatch from "../components/ColorSwatch";
 
 export default function ProductPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const variantParam = searchParams.get("variant");
   const { addItem } = useCart();
   const { show } = useToast();
 
@@ -35,9 +38,15 @@ export default function ProductPage() {
 
   useEffect(() => {
     if (!product) return;
-    setSelectedVariantId(product.defaultVariantId ?? product.variants[0]?.id ?? null);
+    const fromUrl = variantParam
+      ? product.variants.find((variant) => variant.id === variantParam)
+      : undefined;
+    setSelectedVariantId(
+      fromUrl?.id ?? product.defaultVariantId ?? product.variants[0]?.id ?? null,
+    );
     setSelectedSize(null);
-  }, [product]);
+    setAddedSize(null);
+  }, [product, variantParam]);
 
   if (error) {
     return <p className="py-10 text-center text-sm text-red-600">{error}</p>;
@@ -117,12 +126,19 @@ export default function ProductPage() {
                     hapticSelection();
                     setSelectedVariantId(variant.id);
                     setSelectedSize(null);
+                    setAddedSize(null);
                   }}
                   className={[
-                    "press rounded-button px-3 py-2 text-sm font-medium",
+                    "press flex items-center gap-2 rounded-button px-3 py-2 text-sm font-medium",
                     active ? "bg-ink text-white" : "bg-surface text-ink hover:bg-line",
                   ].join(" ")}
                 >
+                  <ColorSwatch
+                    name={variant.name}
+                    colorHex={variant.colorHex}
+                    size={16}
+                    className={active ? "ring-white/40" : ""}
+                  />
                   {variant.name}
                 </button>
               );

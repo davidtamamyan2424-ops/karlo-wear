@@ -57,9 +57,11 @@ model ProductVariant {
   productId  String
   name       String
   sku        String               @unique
+  colorHex   String? // цвет для превью на витрине (#RRGGBB)
   price      Int?
   imageUrl   String?
   imagesJson String?
+  position   Int                  @default(0)
   isDefault  Boolean              @default(false)
   sizes      ProductVariantSize[]
   orderItems OrderItem[]

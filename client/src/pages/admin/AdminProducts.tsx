@@ -3,6 +3,7 @@ import { ru } from "../../i18n/ru";
 import { PRODUCT_BADGE_LABELS, type ProductBadge } from "../../constants";
 import type { Product } from "../../types";
 import { fileUrl } from "../../api/client";
+import { ApiError } from "../../api/client";
 import { formatPrice } from "../../lib/format";
 import {
   adminDeleteProduct,
@@ -68,8 +69,8 @@ export default function AdminProducts({ token, archived = false }: { token: stri
       const copy = await adminDuplicateProduct(token, product.id);
       upsert(copy);
       setForm({ product: copy });
-    } catch {
-      setError(t.duplicateError);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t.duplicateError);
     } finally {
       setBusyId(null);
     }

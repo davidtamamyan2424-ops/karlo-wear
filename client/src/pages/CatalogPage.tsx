@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fetchProducts } from "../api/endpoints";
-import type { Product } from "../types";
 import { ru } from "../i18n/ru";
 import ProductCard from "../components/ProductCard";
+import { expandCatalog } from "../lib/catalog";
 
 function Skeleton() {
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col rounded-card bg-card p-2 shadow-card">
       <div className="aspect-[4/5] w-full animate-pulse rounded-card bg-surface" />
       <div className="mt-3 h-3 w-3/4 animate-pulse rounded bg-surface" />
       <div className="mt-2 h-3 w-1/3 animate-pulse rounded bg-surface" />
@@ -15,7 +15,7 @@ function Skeleton() {
 }
 
 export default function CatalogPage() {
-  const [products, setProducts] = useState<Product[] | null>(null);
+  const [products, setProducts] = useState<Awaited<ReturnType<typeof fetchProducts>> | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -23,6 +23,19 @@ export default function CatalogPage() {
       .then(setProducts)
       .catch(() => setError(ru.common.error));
   }, []);
+
+  const catalogItems = useMemo(
+    () => (products ? expandCatalog(products) : []),
+    [products],
+  );
+
+  const multiColorProducts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const product of products ?? []) {
+      counts.set(product.id, product.variants.length);
+    }
+    return counts;
+  }, [products]);
 
   return (
     <div className="animate-fade-in">
@@ -43,19 +56,22 @@ export default function CatalogPage() {
         </div>
       )}
 
-      {products && products.length === 0 && (
+      {products && catalogItems.length === 0 && (
         <p className="py-8 text-center text-sm text-muted">{ru.catalog.empty}</p>
       )}
 
-      {products && products.length > 0 && (
+      {catalogItems.length > 0 && (
         <div className="grid grid-cols-2 gap-x-3 gap-y-7">
-          {products.map((product, i) => (
+          {catalogItems.map((item, i) => (
             <div
-              key={product.id}
+              key={item.key}
               className="animate-fade-up"
               style={{ animationDelay: `${Math.min(i * 60, 360)}ms` }}
             >
-              <ProductCard product={product} />
+              <ProductCard
+                item={item}
+                showColor={(multiColorProducts.get(item.product.id) ?? 0) > 1}
+              />
             </div>
           ))}
         </div>

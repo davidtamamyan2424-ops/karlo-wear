@@ -108,6 +108,12 @@ const productVariantSchema = z.object({
   id: z.string().trim().min(1).optional(),
   name: z.string().trim().min(1, "Укажите название цвета").max(80),
   sku: z.string().trim().min(1, "Укажите артикул варианта").max(80),
+  colorHex: z
+    .string()
+    .trim()
+    .optional()
+    .nullable()
+    .refine((v) => !v || /^#[0-9A-Fa-f]{6}$/.test(v), "Укажите цвет в формате #RRGGBB"),
   price: z.number().int("Цена должна быть целым числом").min(1).optional().nullable(),
   images: productImagesSchema.optional(),
   sizes: z.array(sizeStockSchema).max(SIZES.length),

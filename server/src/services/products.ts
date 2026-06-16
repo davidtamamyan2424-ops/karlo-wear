@@ -44,6 +44,8 @@ function normalizeVariants(product: ProductWithRelations): VariantWithSizes[] {
       price: null,
       imageUrl: product.imageUrl,
       imagesJson: product.imagesJson,
+      colorHex: null,
+      position: 0,
       isDefault: true,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
@@ -91,7 +93,7 @@ export function serializeProduct(product: ProductWithRelations) {
 export async function listProducts() {
   const products = await prisma.product.findMany({
     where: { isActive: true, archived: false },
-    include: { sizes: true, variants: { include: { sizes: true }, orderBy: { createdAt: "asc" } } },
+    include: { sizes: true, variants: { include: { sizes: true }, orderBy: { position: "asc" } } },
     orderBy: [{ position: "asc" }, { createdAt: "desc" }],
   });
   return products.map(serializeProduct);
@@ -100,7 +102,7 @@ export async function listProducts() {
 export async function getProductById(id: string) {
   const product = await prisma.product.findUnique({
     where: { id },
-    include: { sizes: true, variants: { include: { sizes: true }, orderBy: { createdAt: "asc" } } },
+    include: { sizes: true, variants: { include: { sizes: true }, orderBy: { position: "asc" } } },
   });
   if (!product || !product.isActive || product.archived) throw notFound("Товар не найден");
   return serializeProduct(product);
