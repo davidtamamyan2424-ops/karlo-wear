@@ -5,12 +5,15 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { isIntentionalTap, isScrollGesture } from "../lib/intentionalTap";
 
 interface ImageGalleryProps {
   images: string[];
   alt: string;
-  /** Вызывается при чистом тапе (без свайпа) — например, для перехода на страницу товара. */
+  /** Намеренный тап — например, переход на страницу товара в каталоге. */
   onTap?: () => void;
+  /** Намеренный тап по изображению — открытие полноэкранного просмотра. */
+  onImageClick?: (index: number) => void;
   /** Соотношение сторон контейнера, напр. "4/5" или "3/4". */
   aspect?: string;
   className?: string;
@@ -19,13 +22,13 @@ interface ImageGalleryProps {
   eagerFirst?: boolean;
 }
 
-const TAP_THRESHOLD = 8; // px — меньше считается тапом
-const SWIPE_THRESHOLD = 0.18; // доля ширины для смены кадра
+const SWIPE_THRESHOLD = 0.18;
 
 export default function ImageGallery({
   images,
   alt,
   onTap,
+  onImageClick,
   aspect = "4/5",
   className = "",
   rounded = "rounded-card",
@@ -41,13 +44,20 @@ export default function ImageGallery({
     active: false,
     decided: false,
     horizontal: false,
+    scrolling: false,
     startX: 0,
     startY: 0,
+    maxDx: 0,
+    maxDy: 0,
     pointerId: -1,
-    moved: 0,
   });
 
-  // Предзагрузка следующего изображения
+  useEffect(() => {
+    setIndex(0);
+    setDragDx(0);
+    setDragging(false);
+  }, [images]);
+
   useEffect(() => {
     const next = list[index + 1];
     if (next) {
@@ -58,15 +68,32 @@ export default function ImageGallery({
 
   const width = () => containerRef.current?.offsetWidth ?? 1;
 
+  const resetDrag = () => {
+    drag.current = {
+      active: false,
+      decided: false,
+      horizontal: false,
+      scrolling: false,
+      startX: 0,
+      startY: 0,
+      maxDx: 0,
+      maxDy: 0,
+      pointerId: -1,
+    };
+  };
+
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
     drag.current = {
       active: true,
       decided: false,
       horizontal: false,
+      scrolling: false,
       startX: e.clientX,
       startY: e.clientY,
+      maxDx: 0,
+      maxDy: 0,
       pointerId: e.pointerId,
-      moved: 0,
     };
   };
 
@@ -75,13 +102,19 @@ export default function ImageGallery({
     if (!d.active) return;
     const dx = e.clientX - d.startX;
     const dy = e.clientY - d.startY;
-    d.moved = Math.max(d.moved, Math.abs(dx));
+    d.maxDx = Math.max(d.maxDx, Math.abs(dx));
+    d.maxDy = Math.max(d.maxDy, Math.abs(dy));
+
+    if (isScrollGesture(d.maxDx, d.maxDy)) {
+      d.scrolling = true;
+    }
 
     if (!d.decided) {
-      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      if (d.maxDx < 6 && d.maxDy < 6) return;
       d.decided = true;
-      d.horizontal = Math.abs(dx) > Math.abs(dy);
-      if (d.horizontal) {
+      if (d.scrolling) return;
+      d.horizontal = d.maxDx > d.maxDy;
+      if (d.horizontal && list.length > 1) {
         setDragging(true);
         try {
           containerRef.current?.setPointerCapture(e.pointerId);
@@ -91,8 +124,7 @@ export default function ImageGallery({
       }
     }
 
-    if (d.horizontal) {
-      // сопротивление на краях
+    if (d.horizontal && list.length > 1) {
       let resisted = dx;
       if ((index === 0 && dx > 0) || (index === list.length - 1 && dx < 0)) {
         resisted = dx * 0.35;
@@ -101,12 +133,18 @@ export default function ImageGallery({
     }
   };
 
+  const fireTapIfNeeded = () => {
+    const d = drag.current;
+    if (!isIntentionalTap(d.maxDx, d.maxDy, d.scrolling)) return;
+    if (onImageClick) onImageClick(index);
+    else onTap?.();
+  };
+
   const endDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d.active) return;
-    d.active = false;
 
-    if (d.horizontal) {
+    if (d.horizontal && list.length > 1) {
       const dx = e.clientX - d.startX;
       const threshold = width() * SWIPE_THRESHOLD;
       let nextIndex = index;
@@ -120,9 +158,13 @@ export default function ImageGallery({
       } catch {
         /* noop */
       }
-    } else if (d.moved < TAP_THRESHOLD) {
-      onTap?.();
+    } else if (!d.decided) {
+      fireTapIfNeeded();
+    } else if (!d.horizontal && !d.scrolling) {
+      fireTapIfNeeded();
     }
+
+    resetDrag();
   };
 
   const goTo = (i: number, e: ReactMouseEvent<HTMLButtonElement>) => {
@@ -134,7 +176,7 @@ export default function ImageGallery({
     <div
       ref={containerRef}
       className={`relative overflow-hidden bg-surface ${rounded} ${className}`}
-      style={{ aspectRatio: aspect, touchAction: "pan-y" }}
+      style={{ aspectRatio: aspect, touchAction: "pan-y pinch-zoom" }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
@@ -169,12 +211,10 @@ export default function ImageGallery({
 
       {list.length > 1 && (
         <>
-          {/* Счётчик позиции */}
           <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-ink/55 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
             {index + 1} / {list.length}
           </div>
 
-          {/* Точки-индикаторы */}
           <div className="absolute inset-x-0 bottom-3 flex items-center justify-center gap-1.5">
             {list.map((_, i) => (
               <button

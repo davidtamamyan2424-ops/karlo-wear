@@ -2,14 +2,19 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import { ru } from "../i18n/ru";
 import { useCart } from "../cart/CartContext";
 import Footer from "./Footer";
+import BackButton from "./BackButton";
+import ScrollToTop from "./ScrollToTop";
 
 export default function Layout() {
   const { count } = useCart();
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin");
+  const isCatalog = location.pathname === "/";
+  const showBack = !isCatalog;
 
   return (
     <div className="min-h-screen bg-paper text-ink">
+      <ScrollToTop />
       <header className="sticky top-0 z-30 border-b border-line/70 bg-paper/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3.5">
           <Link
@@ -40,6 +45,11 @@ export default function Layout() {
             </Link>
           )}
         </div>
+        {showBack && (
+          <div className="mx-auto max-w-2xl border-t border-line/50 px-4 py-2">
+            <BackButton />
+          </div>
+        )}
       </header>
 
       <main

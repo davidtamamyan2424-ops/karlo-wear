@@ -1,4 +1,5 @@
 import { ru } from "../i18n/ru";
+import { useIntentionalTap } from "../lib/intentionalTap";
 
 interface Props {
   aspect?: string;
@@ -14,6 +15,7 @@ export default function VariantImagePlaceholder({
   onTap,
 }: Props) {
   const p = ru.product.photoPlaceholder;
+  const tapHandlers = useIntentionalTap(onTap);
 
   const content = (
     <>
@@ -26,14 +28,21 @@ export default function VariantImagePlaceholder({
 
   if (onTap) {
     return (
-      <button
-        type="button"
-        onClick={onTap}
-        className={`press w-full ${baseClass}`}
-        style={{ aspectRatio: aspect }}
+      <div
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onTap();
+          }
+        }}
+        className={`press w-full cursor-pointer ${baseClass}`}
+        style={{ aspectRatio: aspect, touchAction: "pan-y" }}
+        {...tapHandlers}
       >
         {content}
-      </button>
+      </div>
     );
   }
 

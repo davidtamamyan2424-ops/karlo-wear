@@ -12,6 +12,7 @@ import ImageGallery from "../components/ImageGallery";
 import SizeChartModal from "../components/SizeChartModal";
 import ColorSwatch from "../components/ColorSwatch";
 import VariantImagePlaceholder from "../components/VariantImagePlaceholder";
+import FullscreenImageViewer from "../components/FullscreenImageViewer";
 
 export default function ProductPage() {
   const { id } = useParams<{ id: string }>();
@@ -28,6 +29,8 @@ export default function ProductPage() {
   const [addedSize, setAddedSize] = useState<Size | null>(null);
   const [flash, setFlash] = useState(false);
   const [sizeChartOpen, setSizeChartOpen] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
 
   useEffect(() => {
     if (!id) return;
@@ -47,7 +50,12 @@ export default function ProductPage() {
     );
     setSelectedSize(null);
     setAddedSize(null);
+    setViewerOpen(false);
   }, [product, variantParam]);
+
+  useEffect(() => {
+    setViewerOpen(false);
+  }, [selectedVariantId]);
 
   if (error) {
     return <p className="py-10 text-center text-sm text-red-600">{error}</p>;
@@ -102,7 +110,17 @@ export default function ProductPage() {
   return (
     <div className="animate-fade-in space-y-5">
       {hasVariantImages ? (
-        <ImageGallery images={variantImages} alt={product.name} aspect="3/4" eagerFirst />
+        <ImageGallery
+          key={selectedVariant?.id}
+          images={variantImages}
+          alt={product.name}
+          aspect="3/4"
+          eagerFirst
+          onImageClick={(index) => {
+            setViewerIndex(index);
+            setViewerOpen(true);
+          }}
+        />
       ) : (
         <VariantImagePlaceholder aspect="3/4" />
       )}
@@ -257,6 +275,15 @@ export default function ProductPage() {
       </div>
 
       <div className="h-16" />
+
+      {viewerOpen && hasVariantImages && (
+        <FullscreenImageViewer
+          images={variantImages}
+          initialIndex={viewerIndex}
+          alt={product.name}
+          onClose={() => setViewerOpen(false)}
+        />
+      )}
 
       {sizeChartOpen && product.sizeChartUrl && (
         <SizeChartModal

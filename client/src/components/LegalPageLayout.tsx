@@ -1,6 +1,4 @@
-import { Link } from "react-router-dom";
 import { LEGAL } from "../constants/legal";
-import { ru } from "../i18n/ru";
 
 interface Props {
   title: string;
@@ -10,13 +8,6 @@ interface Props {
 export default function LegalPageLayout({ title, children }: Props) {
   return (
     <article className="animate-fade-in pb-8">
-      <Link
-        to="/"
-        className="press mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted"
-      >
-        ← {ru.common.back}
-      </Link>
-
       <header className="mb-6 border-b border-line pb-4">
         <p className="text-xs uppercase tracking-[0.18em] text-muted">{LEGAL.brand}</p>
         <h1 className="mt-1 text-[26px] font-semibold tracking-tight text-ink">{title}</h1>
