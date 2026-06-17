@@ -1,15 +1,11 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, Product } from "@prisma/client";
 import { conflict } from "../lib/errors.js";
 
 type Tx = Prisma.TransactionClient;
 
-/** Полная себестоимость единицы товара в копейках. */
-export function productUnitCost(product: {
-  productionCost: number;
-  packagingCost: number;
-  otherUnitCost: number;
-}): number {
-  return product.productionCost + product.packagingCost + product.otherUnitCost;
+/** Себестоимость единицы товара в копейках. */
+export function productUnitCost(product: Pick<Product, "unitCost">): number {
+  return product.unitCost;
 }
 
 /** Уменьшает остаток варианта; синхронизирует ProductSize для дефолтного варианта. */

@@ -2,7 +2,6 @@ import { z } from "zod";
 import { SIZES, ORDER_STATUSES, PRODUCT_BADGES, DELIVERY_METHODS } from "./constants.js";
 import {
   EXPENSE_CATEGORIES,
-  PAYMENT_METHODS,
   SALE_CATEGORIES,
 } from "./constants/finance.js";
 import { normalizeRuPhone } from "./lib/phone.js";
@@ -129,9 +128,7 @@ export const createProductSchema = z.object({
   description: z.string().trim().max(4000).optional().nullable(),
   // Цена в копейках (minor units)
   price: z.number().int("Цена должна быть целым числом").min(1, "Укажите цену"),
-  productionCost: z.number().int().min(0).optional(),
-  packagingCost: z.number().int().min(0).optional(),
-  otherUnitCost: z.number().int().min(0).optional(),
+  unitCost: z.number().int().min(0).optional(),
   composition: z.string().trim().max(200).optional().nullable(),
   badge: z.enum(PRODUCT_BADGES).optional().nullable(),
   images: productImagesSchema.optional(),
@@ -165,29 +162,12 @@ export const manualSaleSchema = z.object({
   quantity: z.number().int().min(1).max(999),
   amount: z.number().int().min(0).nullable(),
   comment: z.string().trim().max(500).optional().nullable(),
-  paymentMethod: z.enum(PAYMENT_METHODS),
   saleCategory: z.enum(SALE_CATEGORIES),
 });
 
 export const expenseSchema = z.object({
   date: z.string().min(1),
   category: z.enum(EXPENSE_CATEGORIES),
-  amount: z.number().int().min(1),
-  comment: z.string().trim().max(500).optional().nullable(),
-  paymentSource: z.enum(["CASH", "CARD"]).optional(),
-});
-
-const MANUAL_MONEY_TYPES = [
-  "CASH_IN",
-  "CASH_OUT",
-  "CARD_IN",
-  "CARD_OUT",
-  "TRANSFER_TO_CARD",
-  "TRANSFER_TO_CASH",
-] as const;
-
-export const moneyOperationSchema = z.object({
-  type: z.enum(MANUAL_MONEY_TYPES),
   amount: z.number().int().min(1),
   comment: z.string().trim().max(500).optional().nullable(),
 });

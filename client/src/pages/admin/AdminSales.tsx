@@ -11,7 +11,6 @@ import { SIZES } from "../../constants";
 import { ru } from "../../i18n/ru";
 import { formatPrice } from "../../lib/format";
 import {
-  PAYMENT_METHOD_LABELS,
   SALE_CATEGORY_LABELS,
 } from "../../constants/finance";
 import { ApiError } from "../../api/client";
@@ -34,8 +33,7 @@ export default function AdminSales({ token }: Props) {
   const [quantity, setQuantity] = useState("1");
   const [amountRub, setAmountRub] = useState("");
   const [comment, setComment] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("CASH");
-  const [saleCategory, setSaleCategory] = useState("FRIEND");
+  const [saleCategory, setSaleCategory] = useState("SALE");
 
   const load = () => {
     void adminFetchProducts(token).then(setProducts);
@@ -60,8 +58,7 @@ export default function AdminSales({ token }: Props) {
     setQuantity("1");
     setAmountRub("");
     setComment("");
-    setPaymentMethod("CASH");
-    setSaleCategory("FRIEND");
+    setSaleCategory("SALE");
   };
 
   const submit = async (e: FormEvent) => {
@@ -89,7 +86,6 @@ export default function AdminSales({ token }: Props) {
         quantity: Number(quantity),
         amount,
         comment: comment.trim() || null,
-        paymentMethod,
         saleCategory,
       });
       setShowForm(false);
@@ -216,21 +212,6 @@ export default function AdminSales({ token }: Props) {
               className={inputCls}
             >
               {Object.entries(SALE_CATEGORY_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium">{t.paymentMethod}</span>
-            <select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
-              className={inputCls}
-            >
-              {Object.entries(PAYMENT_METHOD_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>
                   {v}
                 </option>

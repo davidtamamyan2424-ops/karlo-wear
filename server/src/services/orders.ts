@@ -268,40 +268,6 @@ async function restoreStock(
   await tx.order.update({ where: { id: orderId }, data: { stockRestored: true } });
 }
 
-async function recordOrderPayment(
-  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
-  orderId: string,
-  totalAmount: number,
-) {
-  await tx.moneyTransaction.create({
-    data: {
-      type: "ORDER_PAYMENT",
-      cardDelta: totalAmount,
-      amount: totalAmount,
-      comment: "Оплата заказа через сайт",
-      orderId,
-    },
-  });
-  await tx.order.update({ where: { id: orderId }, data: { financeRecorded: true } });
-}
-
-async function reverseOrderPayment(
-  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
-  order: { id: string; totalAmount: number; financeRecorded: boolean },
-) {
-  if (!order.financeRecorded) return;
-  await tx.moneyTransaction.create({
-    data: {
-      type: "ORDER_REFUND",
-      cardDelta: -order.totalAmount,
-      amount: order.totalAmount,
-      comment: "Возврат по отменённому заказу",
-      orderId: order.id,
-    },
-  });
-  await tx.order.update({ where: { id: order.id }, data: { financeRecorded: false } });
-}
-
 /** Смена статуса заказа администратором. При отмене восстанавливает склад. */
 export async function setOrderStatus(orderId: string, status: OrderStatus) {
   if (!isOrderStatus(status)) throw badRequest("Недопустимый статус заказа");
@@ -312,20 +278,13 @@ export async function setOrderStatus(orderId: string, status: OrderStatus) {
 
     if (status === "CANCELLED") {
       await restoreStock(tx, orderId);
-      await reverseOrderPayment(tx, existing);
     }
 
-    const updated = await tx.order.update({
+    return tx.order.update({
       where: { id: orderId },
       data: { status },
       include: orderInclude,
     });
-
-    if (status === "PAID" && !existing.financeRecorded) {
-      await recordOrderPayment(tx, orderId, existing.totalAmount);
-    }
-
-    return updated;
   });
 }
 
@@ -358,7 +317,6 @@ export async function cancelExpiredOrders(): Promise<number> {
   let cancelled = 0;
   for (const { id } of expired) {
     await prisma.$transaction(async (tx) => {
-      // Перечитываем внутри транзакции — статус мог измениться.
       const order = await tx.order.findUnique({ where: { id } });
       if (!order || order.status !== "AWAITING_PAYMENT") return;
       await restoreStock(tx, id);

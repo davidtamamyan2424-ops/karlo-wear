@@ -63,9 +63,7 @@ function normalizeVariants(product: ProductWithRelations): VariantWithSizes[] {
 export function serializeProduct(product: ProductWithRelations, options?: { includeCosts?: boolean }) {
   const {
     imagesJson: _imagesJson,
-    productionCost: _pc,
-    packagingCost: _pk,
-    otherUnitCost: _ou,
+    unitCost: _uc,
     ...rest
   } = product;
   const variants = normalizeVariants(product).map((variant) => {
@@ -97,10 +95,7 @@ export function serializeProduct(product: ProductWithRelations, options?: { incl
   if (options?.includeCosts) {
     return {
       ...base,
-      productionCost: product.productionCost,
-      packagingCost: product.packagingCost,
-      otherUnitCost: product.otherUnitCost,
-      unitCost: product.productionCost + product.packagingCost + product.otherUnitCost,
+      unitCost: product.unitCost,
     };
   }
   return base;

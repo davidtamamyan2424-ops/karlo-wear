@@ -19,7 +19,6 @@ export default function AdminExpenses({ token }: Props) {
   const [category, setCategory] = useState("HOSTING");
   const [amountRub, setAmountRub] = useState("");
   const [comment, setComment] = useState("");
-  const [paymentSource, setPaymentSource] = useState("CARD");
 
   const load = () => void adminFetchExpenses(token).then(setItems);
 
@@ -39,7 +38,6 @@ export default function AdminExpenses({ token }: Props) {
         category,
         amount,
         comment: comment.trim() || null,
-        paymentSource,
       });
       setShowForm(false);
       setAmountRub("");
@@ -82,14 +80,6 @@ export default function AdminExpenses({ token }: Props) {
             onChange={(e) => setAmountRub(e.target.value)}
             className={inputCls}
           />
-          <select
-            value={paymentSource}
-            onChange={(e) => setPaymentSource(e.target.value)}
-            className={inputCls}
-          >
-            <option value="CARD">С карты</option>
-            <option value="CASH">Из наличных</option>
-          </select>
           <input
             placeholder={t.comment}
             value={comment}

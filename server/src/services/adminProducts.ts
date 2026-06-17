@@ -144,9 +144,7 @@ export async function createProduct(input: CreateProductBody) {
         badge: input.badge ?? null,
         isActive: input.isActive ?? true,
         archived: false,
-        productionCost: input.productionCost ?? 0,
-        packagingCost: input.packagingCost ?? 0,
-        otherUnitCost: input.otherUnitCost ?? 0,
+        unitCost: input.unitCost ?? 0,
         imagesJson: imageCols.imagesJson,
         imageUrl: imageCols.imageUrl,
         sizeChartUrl: input.sizeChartUrl ?? null,
@@ -197,9 +195,7 @@ export async function updateProduct(id: string, input: UpdateProductBody) {
   if ("composition" in input) data.composition = input.composition ?? null;
   if ("badge" in input) data.badge = input.badge ?? null;
   if ("sizeChartUrl" in input) data.sizeChartUrl = input.sizeChartUrl ?? null;
-  if (input.productionCost !== undefined) data.productionCost = input.productionCost;
-  if (input.packagingCost !== undefined) data.packagingCost = input.packagingCost;
-  if (input.otherUnitCost !== undefined) data.otherUnitCost = input.otherUnitCost;
+  if (input.unitCost !== undefined) data.unitCost = input.unitCost;
 
   const imageCols = imagesToColumns(input.images);
   if (imageCols) {

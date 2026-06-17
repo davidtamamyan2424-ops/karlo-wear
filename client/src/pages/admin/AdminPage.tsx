@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { ru } from "../../i18n/ru";
 import { adminCheckSession } from "../../api/endpoints";
+import { currentMonthKey } from "../../lib/period";
 import AdminOrders from "./AdminOrders";
 import AdminPaymentAccounts from "./AdminPaymentAccounts";
 import AdminProducts from "./AdminProducts";
@@ -31,6 +32,7 @@ export default function AdminPage() {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
   const [tab, setTab] = useState<Tab>("dashboard");
+  const [period, setPeriod] = useState(currentMonthKey);
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -121,13 +123,13 @@ export default function AdminPage() {
         ))}
       </div>
 
-      {tab === "dashboard" && <AdminDashboard token={token} />}
+      {tab === "dashboard" && <AdminDashboard token={token} period={period} onPeriodChange={setPeriod} />}
       {tab === "orders" && <AdminOrders token={token} />}
       {tab === "products" && <AdminProducts token={token} archived={false} />}
       {tab === "warehouse" && <AdminWarehouse token={token} />}
       {tab === "sales" && <AdminSales token={token} />}
-      {tab === "finance" && <AdminFinance token={token} />}
-      {tab === "analytics" && <AdminAnalytics token={token} />}
+      {tab === "finance" && <AdminFinance token={token} period={period} onPeriodChange={setPeriod} />}
+      {tab === "analytics" && <AdminAnalytics token={token} period={period} onPeriodChange={setPeriod} />}
       {tab === "expenses" && <AdminExpenses token={token} />}
       {tab === "archive" && <AdminProducts token={token} archived />}
       {tab === "accounts" && <AdminPaymentAccounts token={token} />}

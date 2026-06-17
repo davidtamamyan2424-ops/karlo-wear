@@ -13,7 +13,6 @@ import {
   updateProductSchema,
   manualSaleSchema,
   expenseSchema,
-  moneyOperationSchema,
 } from "../validation.js";
 import { listOrders, setOrderStatus } from "../services/orders.js";
 import {
@@ -42,7 +41,7 @@ import {
 } from "../services/adminFinance.js";
 import { listManualSales, createManualSale } from "../services/adminManualSales.js";
 import { listExpenses, createExpense, deleteExpense } from "../services/adminExpenses.js";
-import { listMoneyTransactions, createMoneyOperation } from "../services/adminMoney.js";
+import { parseMonthQuery } from "../lib/period.js";
 import { uploadProductImages, uploadSizeChart } from "../lib/upload.js";
 import { UPLOADS_URL_PREFIX } from "../lib/uploads.js";
 
@@ -221,24 +220,25 @@ adminRouter.get(
 
 adminRouter.get(
   "/dashboard",
-  asyncHandler(async (_req, res) => {
-    res.json(await getDashboard());
+  asyncHandler(async (req, res) => {
+    const month = typeof req.query.month === "string" ? req.query.month : undefined;
+    res.json(await getDashboard(month));
   }),
 );
 
 adminRouter.get(
   "/analytics",
-  asyncHandler(async (_req, res) => {
-    res.json(await getAnalytics());
+  asyncHandler(async (req, res) => {
+    const month = typeof req.query.month === "string" ? req.query.month : undefined;
+    res.json(await getAnalytics(month));
   }),
 );
 
 adminRouter.get(
   "/finance/summary",
   asyncHandler(async (req, res) => {
-    const from = typeof req.query.from === "string" ? new Date(req.query.from) : undefined;
-    const to = typeof req.query.to === "string" ? new Date(req.query.to) : undefined;
-    res.json(await computePeriodMetrics({ from, to }));
+    const month = typeof req.query.month === "string" ? req.query.month : undefined;
+    res.json(await computePeriodMetrics(parseMonthQuery(month)));
   }),
 );
 
@@ -268,12 +268,7 @@ adminRouter.post(
   "/expenses",
   asyncHandler(async (req, res) => {
     const body = expenseSchema.parse(req.body);
-    res.status(201).json(
-      await createExpense({
-        ...body,
-        paymentSource: body.paymentSource ?? "CARD",
-      }),
-    );
+    res.status(201).json(await createExpense(body));
   }),
 );
 
@@ -282,20 +277,5 @@ adminRouter.delete(
   asyncHandler(async (req, res) => {
     await deleteExpense(req.params.id);
     res.status(204).send();
-  }),
-);
-
-adminRouter.get(
-  "/money/transactions",
-  asyncHandler(async (_req, res) => {
-    res.json(await listMoneyTransactions());
-  }),
-);
-
-adminRouter.post(
-  "/money/operations",
-  asyncHandler(async (req, res) => {
-    const body = moneyOperationSchema.parse(req.body);
-    res.status(201).json(await createMoneyOperation(body));
   }),
 );

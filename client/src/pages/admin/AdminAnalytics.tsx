@@ -4,19 +4,22 @@ import type { AnalyticsData } from "../../types/crm";
 import { ru } from "../../i18n/ru";
 import { formatPrice } from "../../lib/format";
 import BarChart from "../../components/admin/BarChart";
+import PeriodSelector from "../../components/admin/PeriodSelector";
 import { MONTH_NAMES } from "../../constants/finance";
 
 interface Props {
   token: string;
+  period: string;
+  onPeriodChange: (month: string) => void;
 }
 
-export default function AdminAnalytics({ token }: Props) {
+export default function AdminAnalytics({ token, period, onPeriodChange }: Props) {
   const t = ru.admin.crm;
   const [data, setData] = useState<AnalyticsData | null>(null);
 
   useEffect(() => {
-    adminFetchAnalytics(token).then(setData).catch(() => setData(null));
-  }, [token]);
+    adminFetchAnalytics(token, period).then(setData).catch(() => setData(null));
+  }, [token, period]);
 
   if (!data) return <p className="text-sm text-tg-hint">{ru.admin.loading}</p>;
 
@@ -40,7 +43,7 @@ export default function AdminAnalytics({ token }: Props) {
     value: m.otherExpenses,
   }));
 
-  const rank = (items: { model: string; units?: number; revenue?: number; profit?: number }[], key: "units" | "revenue" | "profit") =>
+  const rank = (items: { model: string; units?: number; profit?: number }[], key: "units" | "profit") =>
     items.slice(0, 5).map((i) => ({
       label: i.model,
       value: i[key] ?? 0,
@@ -48,6 +51,8 @@ export default function AdminAnalytics({ token }: Props) {
 
   return (
     <div className="space-y-5">
+      <PeriodSelector value={period} onChange={onPeriodChange} />
+
       <div className="grid gap-4 md:grid-cols-2">
         <ChartBlock title={t.salesChart} items={salesChart} />
         <ChartBlock title={t.revenueChart} items={revenueChart} formatValue={formatPrice} />
@@ -55,9 +60,8 @@ export default function AdminAnalytics({ token }: Props) {
         <ChartBlock title={t.expensesChart} items={expenseChart} formatValue={formatPrice} color="#9ca3af" />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         <RankBlock title={t.topByUnits} items={rank(data.rankings.byUnits, "units")} />
-        <RankBlock title={t.topByRevenue} items={rank(data.rankings.byRevenue, "revenue")} formatValue={formatPrice} />
         <RankBlock title={t.topByProfit} items={rank(data.rankings.byProfit, "profit")} formatValue={formatPrice} />
       </div>
 

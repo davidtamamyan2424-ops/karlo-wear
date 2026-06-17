@@ -33,10 +33,8 @@ model Product {
   archived    Boolean       @default(false)
   // Позиция в каталоге (управляется администратором, сортировка по возрастанию).
   position    Int           @default(0)
-  // Себестоимость (копейки, не показывается покупателям)
-  productionCost Int        @default(0)
-  packagingCost  Int        @default(0)
-  otherUnitCost  Int        @default(0)
+  // Себестоимость единицы (копейки, не показывается покупателям)
+  unitCost       Int           @default(0)
   sizes       ProductSize[]
   variants    ProductVariant[]
   orderItems  OrderItem[]
@@ -119,10 +117,8 @@ model Order {
   paymentDueAt  DateTime?
   // Был ли восстановлен резерв склада (защита от повторного восстановления).
   stockRestored Boolean     @default(false)
-  financeRecorded Boolean   @default(false)
   items         OrderItem[]
   paymentProofs PaymentProof[]
-  moneyTransactions MoneyTransaction[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -178,39 +174,19 @@ model ManualSale {
   quantity             Int
   amount               Int?
   comment              String?
-  paymentMethod        String
-  saleCategory         String             @default("OTHER")
+  saleCategory         String             @default("SALE")
   productName          String
   variantName          String
   sizeLabel            String
   unitCostSnapshot     Int                @default(0)
   createdAt            DateTime           @default(now())
-  moneyTransactions    MoneyTransaction[]
 }
 
 model Expense {
-  id                String             @id @default(cuid())
-  date              DateTime
-  category          String
-  amount            Int
-  comment           String?
-  paymentSource     String             @default("CARD")
-  createdAt         DateTime           @default(now())
-  moneyTransaction  MoneyTransaction?
-}
-
-model MoneyTransaction {
-  id           String      @id @default(cuid())
-  type         String
-  cashDelta    Int         @default(0)
-  cardDelta    Int         @default(0)
-  amount       Int
-  comment      String?
-  order        Order?      @relation(fields: [orderId], references: [id])
-  orderId      String?
-  manualSale   ManualSale? @relation(fields: [manualSaleId], references: [id])
-  manualSaleId String?
-  expense      Expense?    @relation(fields: [expenseId], references: [id])
-  expenseId    String?     @unique
-  createdAt    DateTime    @default(now())
+  id        String   @id @default(cuid())
+  date      DateTime
+  category  String
+  amount    Int
+  comment   String?
+  createdAt DateTime @default(now())
 }

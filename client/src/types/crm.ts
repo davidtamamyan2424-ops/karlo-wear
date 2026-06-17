@@ -9,6 +9,7 @@ export interface PeriodMetrics {
   soldUnits: number;
   freeIssues: number;
   ownerIssues: number;
+  defectIssues: number;
 }
 
 export interface MonthlyMetrics extends PeriodMetrics {
@@ -36,7 +37,6 @@ export interface ManualSale {
   quantity: number;
   amount: number | null;
   comment: string | null;
-  paymentMethod: string;
   saleCategory: string;
   productName: string;
   variantName: string;
@@ -51,29 +51,17 @@ export interface Expense {
   category: string;
   amount: number;
   comment: string | null;
-  paymentSource: string;
-  createdAt: string;
-}
-
-export interface MoneyTransaction {
-  id: string;
-  type: string;
-  cashDelta: number;
-  cardDelta: number;
-  amount: number;
-  comment: string | null;
   createdAt: string;
 }
 
 export interface DashboardData {
   businessBalance: number;
-  cash: number;
-  card: number;
   totalStockUnits: number;
   inventoryValue: number;
-  month: PeriodMetrics;
+  period: PeriodMetrics;
   monthly: MonthlyMetrics[];
   inventoryByProduct: { productId: string; model: string; units: number; value: number }[];
+  selectedMonth?: string;
 }
 
 export interface ModelStats {
@@ -88,7 +76,6 @@ export interface AnalyticsData {
   monthly: MonthlyMetrics[];
   rankings: {
     byUnits: ModelStats[];
-    byRevenue: ModelStats[];
     byProfit: ModelStats[];
   };
   sizeColor: {

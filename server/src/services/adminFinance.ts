@@ -5,6 +5,7 @@ import {
   SALE_STATUSES,
   type SaleCategory,
 } from "../constants/finance.js";
+import { parseMonthQuery } from "../lib/period.js";
 import { productUnitCost } from "./stock.js";
 
 export interface PeriodFilter {
@@ -25,19 +26,6 @@ function monthKey(date: Date): string {
 export function calcOwnerSalary(netProfitKopecks: number): number {
   if (netProfitKopecks < OWNER_SALARY_THRESHOLD) return 0;
   return Math.round(netProfitKopecks * OWNER_SALARY_RATE);
-}
-
-export async function getMoneyBalances() {
-  const txs = await prisma.moneyTransaction.findMany({
-    select: { cashDelta: true, cardDelta: true },
-  });
-  let cash = 0;
-  let card = 0;
-  for (const tx of txs) {
-    cash += tx.cashDelta;
-    card += tx.cardDelta;
-  }
-  return { cash, card, total: cash + card };
 }
 
 export async function getWarehouseStock() {
@@ -81,7 +69,7 @@ async function loadFinanceData() {
 function orderCogs(
   items: {
     quantity: number;
-    product: { productionCost: number; packagingCost: number; otherUnitCost: number };
+    product: { unitCost: number };
   }[],
 ): number {
   return items.reduce(
@@ -101,6 +89,7 @@ export interface PeriodMetrics {
   soldUnits: number;
   freeIssues: number;
   ownerIssues: number;
+  defectIssues: number;
 }
 
 export function emptyMetrics(): PeriodMetrics {
@@ -115,7 +104,42 @@ export function emptyMetrics(): PeriodMetrics {
     soldUnits: 0,
     freeIssues: 0,
     ownerIssues: 0,
+    defectIssues: 0,
   };
+}
+
+function applyManualSaleMetrics(
+  m: PeriodMetrics,
+  sale: {
+    quantity: number;
+    amount: number | null;
+    saleCategory: string;
+    unitCostSnapshot: number;
+  },
+) {
+  if (sale.amount != null && sale.amount > 0) {
+    m.revenue += sale.amount;
+  }
+  m.cogs += sale.unitCostSnapshot * sale.quantity;
+  m.soldUnits += sale.quantity;
+
+  if (sale.saleCategory === "GIFT") {
+    m.freeIssues += sale.quantity;
+  } else if (sale.saleCategory === "SELF") {
+    m.ownerIssues += sale.quantity;
+  } else if (sale.saleCategory === "DEFECT") {
+    m.defectIssues += sale.quantity;
+  } else if (sale.amount == null || sale.amount === 0) {
+    m.freeIssues += sale.quantity;
+  }
+}
+
+function finalizeMetrics(m: PeriodMetrics): PeriodMetrics {
+  m.grossProfit = m.revenue - m.cogs;
+  m.netProfit = m.grossProfit - m.otherExpenses;
+  m.ownerSalary = calcOwnerSalary(m.netProfit);
+  m.developmentFunds = m.netProfit - m.ownerSalary;
+  return m;
 }
 
 export async function computePeriodMetrics(filter: PeriodFilter = {}): Promise<PeriodMetrics> {
@@ -133,15 +157,7 @@ export async function computePeriodMetrics(filter: PeriodFilter = {}): Promise<P
 
   for (const sale of manualSales) {
     if (!inPeriod(sale.createdAt, filter)) continue;
-    if (sale.amount != null && sale.amount > 0) {
-      m.revenue += sale.amount;
-    }
-    m.cogs += sale.unitCostSnapshot * sale.quantity;
-    m.soldUnits += sale.quantity;
-
-    const isFree = sale.amount == null || sale.amount === 0;
-    if (isFree) m.freeIssues += sale.quantity;
-    if (sale.saleCategory === "SELF") m.ownerIssues += sale.quantity;
+    applyManualSaleMetrics(m, sale);
   }
 
   for (const expense of expenses) {
@@ -149,19 +165,15 @@ export async function computePeriodMetrics(filter: PeriodFilter = {}): Promise<P
     m.otherExpenses += expense.amount;
   }
 
-  m.grossProfit = m.revenue - m.cogs;
-  m.netProfit = m.grossProfit - m.otherExpenses;
-  m.ownerSalary = calcOwnerSalary(m.netProfit);
-  m.developmentFunds = m.netProfit - m.ownerSalary;
-
-  return m;
+  return finalizeMetrics(m);
 }
 
 export async function computeBusinessBalance(): Promise<number> {
-  const allTime = await computePeriodMetrics();
-  const monthly = await computeMonthlyBreakdown();
-  const totalOwnerSalary = monthly.reduce((s, row) => s + row.ownerSalary, 0);
-  return allTime.revenue - allTime.cogs - allTime.otherExpenses - totalOwnerSalary;
+  const monthly = await computeMonthlyBreakdown(120);
+  return monthly.reduce(
+    (sum, row) => sum + row.revenue - row.cogs - row.otherExpenses - row.ownerSalary,
+    0,
+  );
 }
 
 export async function computeInventoryValue() {
@@ -190,7 +202,7 @@ export async function computeInventoryValue() {
   };
 }
 
-export async function computeMonthlyBreakdown(months = 12) {
+export async function computeMonthlyBreakdown(months = 12, endAt?: Date) {
   const { orders, manualSales, expenses } = await loadFinanceData();
   const buckets = new Map<string, PeriodMetrics>();
 
@@ -209,13 +221,7 @@ export async function computeMonthlyBreakdown(months = 12) {
 
   for (const sale of manualSales) {
     const key = monthKey(sale.createdAt);
-    const m = touch(key);
-    if (sale.amount != null && sale.amount > 0) m.revenue += sale.amount;
-    m.cogs += sale.unitCostSnapshot * sale.quantity;
-    m.soldUnits += sale.quantity;
-    const isFree = sale.amount == null || sale.amount === 0;
-    if (isFree) m.freeIssues += sale.quantity;
-    if (sale.saleCategory === "SELF") m.ownerIssues += sale.quantity;
+    applyManualSaleMetrics(touch(key), sale);
   }
 
   for (const expense of expenses) {
@@ -223,13 +229,15 @@ export async function computeMonthlyBreakdown(months = 12) {
     touch(key).otherExpenses += expense.amount;
   }
 
-  const keys = [...buckets.keys()].sort().slice(-months);
+  const end = endAt ?? new Date();
+  const endKey = monthKey(end);
+  const allKeys = [...buckets.keys()].sort();
+  const endIdx = allKeys.findIndex((k) => k === endKey);
+  const sliceEnd = endIdx >= 0 ? endIdx + 1 : allKeys.length;
+  const keys = allKeys.slice(Math.max(0, sliceEnd - months), sliceEnd);
+
   return keys.map((key) => {
-    const m = buckets.get(key)!;
-    m.grossProfit = m.revenue - m.cogs;
-    m.netProfit = m.grossProfit - m.otherExpenses;
-    m.ownerSalary = calcOwnerSalary(m.netProfit);
-    m.developmentFunds = m.netProfit - m.ownerSalary;
+    const m = finalizeMetrics({ ...buckets.get(key)! });
     const [year, month] = key.split("-");
     return { month: key, year: Number(year), monthNum: Number(month), ...m };
   });
@@ -243,7 +251,7 @@ export interface ModelStats {
   profit: number;
 }
 
-export async function computeModelRankings() {
+export async function computeModelRankings(filter: PeriodFilter = {}) {
   const { orders, manualSales } = await loadFinanceData();
   const map = new Map<string, ModelStats>();
 
@@ -255,6 +263,7 @@ export async function computeModelRankings() {
   };
 
   for (const order of orders) {
+    if (!inPeriod(order.createdAt, filter)) continue;
     for (const item of order.items) {
       const s = touch(item.productId, item.productName);
       const cost = productUnitCost(item.product) * item.quantity;
@@ -265,6 +274,7 @@ export async function computeModelRankings() {
   }
 
   for (const sale of manualSales) {
+    if (!inPeriod(sale.createdAt, filter)) continue;
     const s = touch(sale.productId, sale.productName);
     const revenue = sale.amount ?? 0;
     const cost = sale.unitCostSnapshot * sale.quantity;
@@ -275,13 +285,12 @@ export async function computeModelRankings() {
 
   const all = [...map.values()];
   const byUnits = [...all].sort((a, b) => b.units - a.units).slice(0, 10);
-  const byRevenue = [...all].sort((a, b) => b.revenue - a.revenue).slice(0, 10);
   const byProfit = [...all].sort((a, b) => b.profit - a.profit).slice(0, 10);
 
-  return { byUnits, byRevenue, byProfit };
+  return { byUnits, byProfit };
 }
 
-export async function computeSizeAndColorRankings() {
+export async function computeSizeAndColorRankings(filter: PeriodFilter = {}) {
   const { orders, manualSales } = await loadFinanceData();
   const sizes = new Map<string, number>();
   const colors = new Map<string, number>();
@@ -291,6 +300,7 @@ export async function computeSizeAndColorRankings() {
   };
 
   for (const order of orders) {
+    if (!inPeriod(order.createdAt, filter)) continue;
     for (const item of order.items) {
       if (item.sizeLabel) add(sizes, item.sizeLabel, item.quantity);
       if (item.variantName) add(colors, item.variantName, item.quantity);
@@ -298,6 +308,7 @@ export async function computeSizeAndColorRankings() {
   }
 
   for (const sale of manualSales) {
+    if (!inPeriod(sale.createdAt, filter)) continue;
     add(sizes, sale.sizeLabel, sale.quantity);
     add(colors, sale.variantName, sale.quantity);
   }
@@ -313,36 +324,36 @@ export async function computeSizeAndColorRankings() {
   };
 }
 
-export async function getDashboard() {
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+export async function getDashboard(month?: string) {
+  const period = parseMonthQuery(month);
+  const endAt = period.to ?? new Date();
 
-  const [balances, inventory, monthMetrics, businessBalance, monthly] = await Promise.all([
-    getMoneyBalances(),
+  const [inventory, periodMetrics, businessBalance, monthly] = await Promise.all([
     computeInventoryValue(),
-    computePeriodMetrics({ from: monthStart, to: monthEnd }),
+    computePeriodMetrics(period),
     computeBusinessBalance(),
-    computeMonthlyBreakdown(6),
+    computeMonthlyBreakdown(6, endAt),
   ]);
 
   return {
     businessBalance,
-    cash: balances.cash,
-    card: balances.card,
     totalStockUnits: inventory.totalUnits,
     inventoryValue: inventory.totalValue,
-    month: monthMetrics,
+    period: periodMetrics,
     monthly,
     inventoryByProduct: inventory.items,
+    selectedMonth: month ?? undefined,
   };
 }
 
-export async function getAnalytics() {
+export async function getAnalytics(month?: string) {
+  const period = parseMonthQuery(month);
+  const endAt = period.to ?? new Date();
+
   const [monthly, rankings, sizeColor, inventory] = await Promise.all([
-    computeMonthlyBreakdown(12),
-    computeModelRankings(),
-    computeSizeAndColorRankings(),
+    computeMonthlyBreakdown(12, endAt),
+    computeModelRankings(period),
+    computeSizeAndColorRankings(period),
     computeInventoryValue(),
   ]);
 
@@ -350,5 +361,5 @@ export async function getAnalytics() {
 }
 
 export function isFreeSale(category: SaleCategory, amount: number | null): boolean {
-  return category === "GIFT" || category === "PROMO" || amount === 0 || amount == null;
+  return category === "GIFT" || amount === 0 || amount == null;
 }

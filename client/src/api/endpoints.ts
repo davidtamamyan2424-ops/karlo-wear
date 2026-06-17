@@ -11,7 +11,6 @@ import type {
   DashboardData,
   Expense,
   ManualSale,
-  MoneyTransaction,
   PeriodMetrics,
   WarehouseRow,
 } from "../types/crm";
@@ -99,9 +98,7 @@ export interface ProductPayload {
   name: string;
   description?: string | null;
   price: number; // в копейках
-  productionCost?: number;
-  packagingCost?: number;
-  otherUnitCost?: number;
+  unitCost?: number;
   composition?: string | null;
   badge?: ProductBadge | null;
   images?: string[];
@@ -226,16 +223,19 @@ export function adminUploadSizeChart(
 }
 
 // --- CRM ---
-export function adminFetchDashboard(token: string): Promise<DashboardData> {
-  return apiRequest<DashboardData>("/admin/dashboard", { adminToken: token });
+export function adminFetchDashboard(token: string, month?: string): Promise<DashboardData> {
+  const query = month ? `?month=${encodeURIComponent(month)}` : "";
+  return apiRequest<DashboardData>(`/admin/dashboard${query}`, { adminToken: token });
 }
 
-export function adminFetchAnalytics(token: string): Promise<AnalyticsData> {
-  return apiRequest<AnalyticsData>("/admin/analytics", { adminToken: token });
+export function adminFetchAnalytics(token: string, month?: string): Promise<AnalyticsData> {
+  const query = month ? `?month=${encodeURIComponent(month)}` : "";
+  return apiRequest<AnalyticsData>(`/admin/analytics${query}`, { adminToken: token });
 }
 
-export function adminFetchFinanceSummary(token: string): Promise<PeriodMetrics> {
-  return apiRequest<PeriodMetrics>("/admin/finance/summary", { adminToken: token });
+export function adminFetchFinanceSummary(token: string, month?: string): Promise<PeriodMetrics> {
+  const query = month ? `?month=${encodeURIComponent(month)}` : "";
+  return apiRequest<PeriodMetrics>(`/admin/finance/summary${query}`, { adminToken: token });
 }
 
 export function adminFetchWarehouse(token: string): Promise<WarehouseRow[]> {
@@ -255,7 +255,6 @@ export function adminCreateManualSale(
     quantity: number;
     amount: number | null;
     comment?: string | null;
-    paymentMethod: string;
     saleCategory: string;
   },
 ): Promise<ManualSale> {
@@ -277,7 +276,6 @@ export function adminCreateExpense(
     category: string;
     amount: number;
     comment?: string | null;
-    paymentSource?: string;
   },
 ): Promise<Expense> {
   return apiRequest<Expense>("/admin/expenses", {
@@ -290,21 +288,6 @@ export function adminCreateExpense(
 export function adminDeleteExpense(token: string, id: string): Promise<void> {
   return apiRequest<void>(`/admin/expenses/${id}`, {
     method: "DELETE",
-    adminToken: token,
-  });
-}
-
-export function adminFetchMoneyTransactions(token: string): Promise<MoneyTransaction[]> {
-  return apiRequest<MoneyTransaction[]>("/admin/money/transactions", { adminToken: token });
-}
-
-export function adminCreateMoneyOperation(
-  token: string,
-  data: { type: string; amount: number; comment?: string | null },
-): Promise<MoneyTransaction> {
-  return apiRequest<MoneyTransaction>("/admin/money/operations", {
-    method: "POST",
-    body: data,
     adminToken: token,
   });
 }

@@ -10,40 +10,10 @@ export const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
 };
 
 export const SALE_CATEGORY_LABELS: Record<string, string> = {
-  FRIEND: "Продано другу",
-  EVENT: "Продано на мероприятии",
-  SELF: "Для себя",
+  SALE: "Продажа",
   GIFT: "Подарок",
-  PROMO: "Промо образец",
-  OTHER: "Другое",
+  SELF: "Для себя",
+  DEFECT: "Брак",
 };
 
-export const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  CASH: "Наличные",
-  CARD: "На карте",
-  NONE: "Без оплаты",
-};
-
-export const MONEY_OPERATION_LABELS: Record<string, string> = {
-  CASH_IN: "Пополнение наличных",
-  CASH_OUT: "Списание наличных",
-  CARD_IN: "Пополнение карты",
-  CARD_OUT: "Списание карты",
-  TRANSFER_TO_CARD: "Перевод наличных на карту",
-  TRANSFER_TO_CASH: "Перевод карты в наличные",
-};
-
-export const MONTH_NAMES = [
-  "Янв",
-  "Фев",
-  "Мар",
-  "Апр",
-  "Май",
-  "Июн",
-  "Июл",
-  "Авг",
-  "Сен",
-  "Окт",
-  "Ноя",
-  "Дек",
-];
+export { MONTH_NAMES_SHORT as MONTH_NAMES } from "../lib/period";
