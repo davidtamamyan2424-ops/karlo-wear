@@ -52,6 +52,10 @@ export interface Product {
   variants: ProductVariant[];
   defaultVariantId?: string | null;
   totalStock?: number;
+  productionCost?: number;
+  packagingCost?: number;
+  otherUnitCost?: number;
+  unitCost?: number;
 }
 
 export interface OrderItem {

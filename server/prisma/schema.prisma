@@ -33,9 +33,14 @@ model Product {
   archived    Boolean       @default(false)
   // Позиция в каталоге (управляется администратором, сортировка по возрастанию).
   position    Int           @default(0)
+  // Себестоимость (копейки, не показывается покупателям)
+  productionCost Int        @default(0)
+  packagingCost  Int        @default(0)
+  otherUnitCost  Int        @default(0)
   sizes       ProductSize[]
   variants    ProductVariant[]
   orderItems  OrderItem[]
+  manualSales ManualSale[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 }
@@ -65,6 +70,7 @@ model ProductVariant {
   isDefault  Boolean              @default(false)
   sizes      ProductVariantSize[]
   orderItems OrderItem[]
+  manualSales ManualSale[]
   createdAt  DateTime             @default(now())
   updatedAt  DateTime             @updatedAt
 
@@ -78,6 +84,7 @@ model ProductVariantSize {
   label      String
   stock      Int            @default(0)
   orderItems OrderItem[]
+  manualSales ManualSale[]
 
   @@unique([variantId, label])
 }
@@ -112,8 +119,10 @@ model Order {
   paymentDueAt  DateTime?
   // Был ли восстановлен резерв склада (защита от повторного восстановления).
   stockRestored Boolean     @default(false)
+  financeRecorded Boolean   @default(false)
   items         OrderItem[]
   paymentProofs PaymentProof[]
+  moneyTransactions MoneyTransaction[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -156,4 +165,52 @@ model OrderItem {
   sizeLabel     String?
   unitPrice     Int
   quantity      Int          @default(1)
+}
+
+model ManualSale {
+  id                   String             @id @default(cuid())
+  product              Product            @relation(fields: [productId], references: [id])
+  productId            String
+  productVariant       ProductVariant     @relation(fields: [productVariantId], references: [id])
+  productVariantId     String
+  productVariantSize   ProductVariantSize @relation(fields: [productVariantSizeId], references: [id])
+  productVariantSizeId String
+  quantity             Int
+  amount               Int?
+  comment              String?
+  paymentMethod        String
+  saleCategory         String             @default("OTHER")
+  productName          String
+  variantName          String
+  sizeLabel            String
+  unitCostSnapshot     Int                @default(0)
+  createdAt            DateTime           @default(now())
+  moneyTransactions    MoneyTransaction[]
+}
+
+model Expense {
+  id                String             @id @default(cuid())
+  date              DateTime
+  category          String
+  amount            Int
+  comment           String?
+  paymentSource     String             @default("CARD")
+  createdAt         DateTime           @default(now())
+  moneyTransaction  MoneyTransaction?
+}
+
+model MoneyTransaction {
+  id           String      @id @default(cuid())
+  type         String
+  cashDelta    Int         @default(0)
+  cardDelta    Int         @default(0)
+  amount       Int
+  comment      String?
+  order        Order?      @relation(fields: [orderId], references: [id])
+  orderId      String?
+  manualSale   ManualSale? @relation(fields: [manualSaleId], references: [id])
+  manualSaleId String?
+  expense      Expense?    @relation(fields: [expenseId], references: [id])
+  expenseId    String?     @unique
+  createdAt    DateTime    @default(now())
 }

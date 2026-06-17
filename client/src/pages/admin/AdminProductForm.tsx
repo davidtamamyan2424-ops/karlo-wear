@@ -49,6 +49,15 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
     product ? String(Math.round(product.price / 100)) : "",
   );
   const [composition, setComposition] = useState(product?.composition ?? "");
+  const [productionCostRub, setProductionCostRub] = useState(
+    product ? String(Math.round((product.productionCost ?? 0) / 100)) : "0",
+  );
+  const [packagingCostRub, setPackagingCostRub] = useState(
+    product ? String(Math.round((product.packagingCost ?? 0) / 100)) : "0",
+  );
+  const [otherUnitCostRub, setOtherUnitCostRub] = useState(
+    product ? String(Math.round((product.otherUnitCost ?? 0) / 100)) : "0",
+  );
   const [badge, setBadge] = useState<string>(product?.badge ?? "");
   const [isActive, setIsActive] = useState(product?.isActive ?? true);
   const makeStock = (sizes: { label: string; stock: number }[] = []): Record<Size, number> => {
@@ -226,6 +235,9 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
       name: name.trim(),
       description: description.trim() || null,
       price: priceKopecks,
+      productionCost: Math.round(Number(productionCostRub || 0) * 100),
+      packagingCost: Math.round(Number(packagingCostRub || 0) * 100),
+      otherUnitCost: Math.round(Number(otherUnitCostRub || 0) * 100),
       composition: composition.trim() || null,
       badge: badge ? (badge as ProductBadge) : null,
       sizeChartUrl,
@@ -302,6 +314,24 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
           <span className="mb-1 block text-xs font-medium">{t.composition}</span>
           <input value={composition} onChange={(e) => setComposition(e.target.value)} placeholder={t.compositionPlaceholder} className={inputCls} />
         </label>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium">{t.productionCost}</span>
+            <input type="number" min={0} value={productionCostRub} onChange={(e) => setProductionCostRub(e.target.value)} className={inputCls} />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium">{t.packagingCost}</span>
+            <input type="number" min={0} value={packagingCostRub} onChange={(e) => setPackagingCostRub(e.target.value)} className={inputCls} />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium">{t.otherUnitCost}</span>
+            <input type="number" min={0} value={otherUnitCostRub} onChange={(e) => setOtherUnitCostRub(e.target.value)} className={inputCls} />
+          </label>
+        </div>
+        <p className="text-xs text-tg-hint">
+          {t.unitCostTotal}: {Math.round(Number(productionCostRub || 0) + Number(packagingCostRub || 0) + Number(otherUnitCostRub || 0))} ₽
+        </p>
 
         <label className="block">
           <span className="mb-1 block text-xs font-medium">{t.badge}</span>

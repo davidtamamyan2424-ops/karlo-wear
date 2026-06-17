@@ -4,18 +4,33 @@ import { adminCheckSession } from "../../api/endpoints";
 import AdminOrders from "./AdminOrders";
 import AdminPaymentAccounts from "./AdminPaymentAccounts";
 import AdminProducts from "./AdminProducts";
+import AdminDashboard from "./AdminDashboard";
+import AdminWarehouse from "./AdminWarehouse";
+import AdminSales from "./AdminSales";
+import AdminFinance from "./AdminFinance";
+import AdminAnalytics from "./AdminAnalytics";
+import AdminExpenses from "./AdminExpenses";
 
 const TOKEN_KEY = "karlo-wear-admin-token";
 
-type Tab = "orders" | "products" | "accounts";
-type TabWithArchive = Tab | "archive";
+type Tab =
+  | "dashboard"
+  | "orders"
+  | "products"
+  | "warehouse"
+  | "sales"
+  | "finance"
+  | "analytics"
+  | "expenses"
+  | "archive"
+  | "accounts";
 
 export default function AdminPage() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
   const [input, setInput] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
-  const [tab, setTab] = useState<TabWithArchive>("orders");
+  const [tab, setTab] = useState<Tab>("dashboard");
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -64,6 +79,19 @@ export default function AdminPage() {
     );
   }
 
+  const tabs: [Tab, string][] = [
+    ["dashboard", ru.admin.tabs.dashboard],
+    ["orders", ru.admin.tabs.orders],
+    ["products", ru.admin.tabs.products],
+    ["warehouse", ru.admin.tabs.warehouse],
+    ["sales", ru.admin.tabs.sales],
+    ["finance", ru.admin.tabs.finance],
+    ["analytics", ru.admin.tabs.analytics],
+    ["expenses", ru.admin.tabs.expenses],
+    ["archive", ru.admin.tabs.archive],
+    ["accounts", ru.admin.tabs.paymentAccounts],
+  ];
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -77,21 +105,14 @@ export default function AdminPage() {
         </button>
       </div>
 
-      <div className="flex gap-2">
-        {(
-          [
-            ["orders", ru.admin.tabs.orders],
-            ["products", ru.admin.tabs.products],
-            ["archive", ru.admin.tabs.archive],
-            ["accounts", ru.admin.tabs.paymentAccounts],
-          ] as [TabWithArchive, string][]
-        ).map(([key, label]) => (
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+        {tabs.map(([key, label]) => (
           <button
             key={key}
             type="button"
             onClick={() => setTab(key)}
             className={[
-              "rounded-xl px-4 py-2 text-sm font-medium",
+              "shrink-0 rounded-xl px-3 py-2 text-sm font-medium",
               tab === key ? "bg-tg-button text-tg-buttonText" : "bg-tg-secondaryBg",
             ].join(" ")}
           >
@@ -100,8 +121,14 @@ export default function AdminPage() {
         ))}
       </div>
 
+      {tab === "dashboard" && <AdminDashboard token={token} />}
       {tab === "orders" && <AdminOrders token={token} />}
       {tab === "products" && <AdminProducts token={token} archived={false} />}
+      {tab === "warehouse" && <AdminWarehouse token={token} />}
+      {tab === "sales" && <AdminSales token={token} />}
+      {tab === "finance" && <AdminFinance token={token} />}
+      {tab === "analytics" && <AdminAnalytics token={token} />}
+      {tab === "expenses" && <AdminExpenses token={token} />}
       {tab === "archive" && <AdminProducts token={token} archived />}
       {tab === "accounts" && <AdminPaymentAccounts token={token} />}
     </div>

@@ -68,7 +68,7 @@ export async function listAdminProducts() {
     },
     orderBy: [{ position: "asc" }, { createdAt: "desc" }],
   });
-  return products.map(serializeProduct);
+  return products.map((p) => serializeProduct(p, { includeCosts: true }));
 }
 
 export async function listArchivedProducts() {
@@ -80,7 +80,7 @@ export async function listArchivedProducts() {
     },
     orderBy: [{ updatedAt: "desc" }],
   });
-  return products.map(serializeProduct);
+  return products.map((p) => serializeProduct(p, { includeCosts: true }));
 }
 
 /** Сохраняет ручной порядок товаров: position = индекс в переданном массиве. */
@@ -102,7 +102,7 @@ export async function getAdminProduct(id: string) {
     },
   });
   if (!product) throw notFound("Товар не найден");
-  return serializeProduct(product);
+  return serializeProduct(product, { includeCosts: true });
 }
 
 export async function createProduct(input: CreateProductBody) {
@@ -144,6 +144,9 @@ export async function createProduct(input: CreateProductBody) {
         badge: input.badge ?? null,
         isActive: input.isActive ?? true,
         archived: false,
+        productionCost: input.productionCost ?? 0,
+        packagingCost: input.packagingCost ?? 0,
+        otherUnitCost: input.otherUnitCost ?? 0,
         imagesJson: imageCols.imagesJson,
         imageUrl: imageCols.imageUrl,
         sizeChartUrl: input.sizeChartUrl ?? null,
@@ -175,7 +178,7 @@ export async function createProduct(input: CreateProductBody) {
       },
       include: { sizes: true, variants: { include: { sizes: true } } },
     });
-    return serializeProduct(product);
+    return serializeProduct(product, { includeCosts: true });
   } catch (error) {
     if (isUniqueViolation(error)) throw conflict("Не удалось создать товар: конфликт артикула");
     throw error;
@@ -194,6 +197,9 @@ export async function updateProduct(id: string, input: UpdateProductBody) {
   if ("composition" in input) data.composition = input.composition ?? null;
   if ("badge" in input) data.badge = input.badge ?? null;
   if ("sizeChartUrl" in input) data.sizeChartUrl = input.sizeChartUrl ?? null;
+  if (input.productionCost !== undefined) data.productionCost = input.productionCost;
+  if (input.packagingCost !== undefined) data.packagingCost = input.packagingCost;
+  if (input.otherUnitCost !== undefined) data.otherUnitCost = input.otherUnitCost;
 
   const imageCols = imagesToColumns(input.images);
   if (imageCols) {
@@ -404,7 +410,7 @@ export async function duplicateProduct(id: string) {
       include: { sizes: true, variants: { include: { sizes: true }, orderBy: { position: "asc" } } },
     });
 
-    return serializeProduct(product);
+    return serializeProduct(product, { includeCosts: true });
   } catch (error) {
     if (isUniqueViolation(error)) {
       throw conflict("Не удалось дублировать товар. Попробуйте ещё раз.");

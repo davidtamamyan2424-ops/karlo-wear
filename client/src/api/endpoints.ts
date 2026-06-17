@@ -6,6 +6,15 @@ import type {
   Product,
   ProductBadge,
 } from "../types";
+import type {
+  AnalyticsData,
+  DashboardData,
+  Expense,
+  ManualSale,
+  MoneyTransaction,
+  PeriodMetrics,
+  WarehouseRow,
+} from "../types/crm";
 import type { OrderStatus } from "../constants";
 
 // --- Публичные эндпоинты ---
@@ -90,6 +99,9 @@ export interface ProductPayload {
   name: string;
   description?: string | null;
   price: number; // в копейках
+  productionCost?: number;
+  packagingCost?: number;
+  otherUnitCost?: number;
   composition?: string | null;
   badge?: ProductBadge | null;
   images?: string[];
@@ -209,6 +221,90 @@ export function adminUploadSizeChart(
   const form = new FormData();
   form.append("image", file);
   return apiUpload<{ url: string }>("/admin/products/size-chart", form, {
+    adminToken: token,
+  });
+}
+
+// --- CRM ---
+export function adminFetchDashboard(token: string): Promise<DashboardData> {
+  return apiRequest<DashboardData>("/admin/dashboard", { adminToken: token });
+}
+
+export function adminFetchAnalytics(token: string): Promise<AnalyticsData> {
+  return apiRequest<AnalyticsData>("/admin/analytics", { adminToken: token });
+}
+
+export function adminFetchFinanceSummary(token: string): Promise<PeriodMetrics> {
+  return apiRequest<PeriodMetrics>("/admin/finance/summary", { adminToken: token });
+}
+
+export function adminFetchWarehouse(token: string): Promise<WarehouseRow[]> {
+  return apiRequest<WarehouseRow[]>("/admin/warehouse", { adminToken: token });
+}
+
+export function adminFetchManualSales(token: string): Promise<ManualSale[]> {
+  return apiRequest<ManualSale[]>("/admin/manual-sales", { adminToken: token });
+}
+
+export function adminCreateManualSale(
+  token: string,
+  data: {
+    productId: string;
+    variantId: string;
+    sizeLabel: ProductBadgeSize;
+    quantity: number;
+    amount: number | null;
+    comment?: string | null;
+    paymentMethod: string;
+    saleCategory: string;
+  },
+): Promise<ManualSale> {
+  return apiRequest<ManualSale>("/admin/manual-sales", {
+    method: "POST",
+    body: data,
+    adminToken: token,
+  });
+}
+
+export function adminFetchExpenses(token: string): Promise<Expense[]> {
+  return apiRequest<Expense[]>("/admin/expenses", { adminToken: token });
+}
+
+export function adminCreateExpense(
+  token: string,
+  data: {
+    date: string;
+    category: string;
+    amount: number;
+    comment?: string | null;
+    paymentSource?: string;
+  },
+): Promise<Expense> {
+  return apiRequest<Expense>("/admin/expenses", {
+    method: "POST",
+    body: data,
+    adminToken: token,
+  });
+}
+
+export function adminDeleteExpense(token: string, id: string): Promise<void> {
+  return apiRequest<void>(`/admin/expenses/${id}`, {
+    method: "DELETE",
+    adminToken: token,
+  });
+}
+
+export function adminFetchMoneyTransactions(token: string): Promise<MoneyTransaction[]> {
+  return apiRequest<MoneyTransaction[]>("/admin/money/transactions", { adminToken: token });
+}
+
+export function adminCreateMoneyOperation(
+  token: string,
+  data: { type: string; amount: number; comment?: string | null },
+): Promise<MoneyTransaction> {
+  return apiRequest<MoneyTransaction>("/admin/money/operations", {
+    method: "POST",
+    body: data,
     adminToken: token,
   });
 }

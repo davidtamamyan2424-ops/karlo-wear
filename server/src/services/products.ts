@@ -60,8 +60,14 @@ function normalizeVariants(product: ProductWithRelations): VariantWithSizes[] {
 }
 
 /** Приводит товар к виду для API: images[] (вместо imagesJson) + сортировка размеров + суммарный остаток. */
-export function serializeProduct(product: ProductWithRelations) {
-  const { imagesJson: _imagesJson, ...rest } = product;
+export function serializeProduct(product: ProductWithRelations, options?: { includeCosts?: boolean }) {
+  const {
+    imagesJson: _imagesJson,
+    productionCost: _pc,
+    packagingCost: _pk,
+    otherUnitCost: _ou,
+    ...rest
+  } = product;
   const variants = normalizeVariants(product).map((variant) => {
     const sizes = sortSizes(variant.sizes);
     const images = parseImagesFromRaw(variant.imagesJson, variant.imageUrl);
@@ -78,7 +84,7 @@ export function serializeProduct(product: ProductWithRelations) {
     ? defaultVariant.images
     : parseImagesFromRaw(product.imagesJson, product.imageUrl);
   const effectivePrice = defaultVariant?.price ?? product.price;
-  return {
+  const base = {
     ...rest,
     price: effectivePrice,
     images,
@@ -88,6 +94,16 @@ export function serializeProduct(product: ProductWithRelations) {
     defaultVariantId: defaultVariant?.id ?? null,
     totalStock: sizes.reduce((sum, s) => sum + s.stock, 0),
   };
+  if (options?.includeCosts) {
+    return {
+      ...base,
+      productionCost: product.productionCost,
+      packagingCost: product.packagingCost,
+      otherUnitCost: product.otherUnitCost,
+      unitCost: product.productionCost + product.packagingCost + product.otherUnitCost,
+    };
+  }
+  return base;
 }
 
 export async function listProducts() {
@@ -96,7 +112,7 @@ export async function listProducts() {
     include: { sizes: true, variants: { include: { sizes: true }, orderBy: { position: "asc" } } },
     orderBy: [{ position: "asc" }, { createdAt: "desc" }],
   });
-  return products.map(serializeProduct);
+  return products.map((p) => serializeProduct(p));
 }
 
 export async function getProductById(id: string) {

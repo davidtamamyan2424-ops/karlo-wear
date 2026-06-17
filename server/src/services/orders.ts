@@ -252,13 +252,13 @@ async function restoreStock(
   if (!RESERVED_STATUSES.includes(order.status as OrderStatus)) return;
 
   for (const item of order.items) {
+    if (item.productVariantSizeId) {
+      await tx.productVariantSize.update({
+        where: { id: item.productVariantSizeId },
+        data: { stock: { increment: item.quantity } },
+      });
+    }
     if (item.productSizeId) {
-      if (item.productVariantSizeId) {
-        await tx.productVariantSize.update({
-          where: { id: item.productVariantSizeId },
-          data: { stock: { increment: item.quantity } },
-        });
-      }
       await tx.productSize.updateMany({
         where: { id: item.productSizeId },
         data: { stock: { increment: item.quantity } },
@@ -266,6 +266,40 @@ async function restoreStock(
     }
   }
   await tx.order.update({ where: { id: orderId }, data: { stockRestored: true } });
+}
+
+async function recordOrderPayment(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  orderId: string,
+  totalAmount: number,
+) {
+  await tx.moneyTransaction.create({
+    data: {
+      type: "ORDER_PAYMENT",
+      cardDelta: totalAmount,
+      amount: totalAmount,
+      comment: "Оплата заказа через сайт",
+      orderId,
+    },
+  });
+  await tx.order.update({ where: { id: orderId }, data: { financeRecorded: true } });
+}
+
+async function reverseOrderPayment(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  order: { id: string; totalAmount: number; financeRecorded: boolean },
+) {
+  if (!order.financeRecorded) return;
+  await tx.moneyTransaction.create({
+    data: {
+      type: "ORDER_REFUND",
+      cardDelta: -order.totalAmount,
+      amount: order.totalAmount,
+      comment: "Возврат по отменённому заказу",
+      orderId: order.id,
+    },
+  });
+  await tx.order.update({ where: { id: order.id }, data: { financeRecorded: false } });
 }
 
 /** Смена статуса заказа администратором. При отмене восстанавливает склад. */
@@ -278,13 +312,20 @@ export async function setOrderStatus(orderId: string, status: OrderStatus) {
 
     if (status === "CANCELLED") {
       await restoreStock(tx, orderId);
+      await reverseOrderPayment(tx, existing);
     }
 
-    return tx.order.update({
+    const updated = await tx.order.update({
       where: { id: orderId },
       data: { status },
       include: orderInclude,
     });
+
+    if (status === "PAID" && !existing.financeRecorded) {
+      await recordOrderPayment(tx, orderId, existing.totalAmount);
+    }
+
+    return updated;
   });
 }
 

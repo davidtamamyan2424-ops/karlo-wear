@@ -15,6 +15,7 @@
     "build:client": "npm run build --workspace client",
     "build:server": "npm run build --workspace server",
     "typecheck": "npm run typecheck --workspace server && npm run typecheck --workspace client",
+    "test": "npm run test --workspace server",
     "prisma:generate": "npm run prisma:generate --workspace server",
     "prisma:migrate": "npm run prisma:migrate --workspace server",
     "prisma:migrate:deploy": "npm run prisma:migrate:deploy --workspace server",

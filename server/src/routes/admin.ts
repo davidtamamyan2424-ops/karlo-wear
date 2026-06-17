@@ -11,6 +11,9 @@ import {
   reorderProductsSchema,
   stockAdjustSchema,
   updateProductSchema,
+  manualSaleSchema,
+  expenseSchema,
+  moneyOperationSchema,
 } from "../validation.js";
 import { listOrders, setOrderStatus } from "../services/orders.js";
 import {
@@ -31,6 +34,15 @@ import {
   restoreProduct,
   updateProduct,
 } from "../services/adminProducts.js";
+import {
+  getWarehouseStock,
+  getDashboard,
+  getAnalytics,
+  computePeriodMetrics,
+} from "../services/adminFinance.js";
+import { listManualSales, createManualSale } from "../services/adminManualSales.js";
+import { listExpenses, createExpense, deleteExpense } from "../services/adminExpenses.js";
+import { listMoneyTransactions, createMoneyOperation } from "../services/adminMoney.js";
 import { uploadProductImages, uploadSizeChart } from "../lib/upload.js";
 import { UPLOADS_URL_PREFIX } from "../lib/uploads.js";
 
@@ -195,5 +207,95 @@ adminRouter.post(
   asyncHandler(async (req, res) => {
     if (!req.file) throw badRequest("Не выбрано изображение размерной сетки");
     res.status(201).json({ url: `${UPLOADS_URL_PREFIX}/${req.file.filename}` });
+  }),
+);
+
+// --- CRM: склад, продажи, финансы ---
+
+adminRouter.get(
+  "/warehouse",
+  asyncHandler(async (_req, res) => {
+    res.json(await getWarehouseStock());
+  }),
+);
+
+adminRouter.get(
+  "/dashboard",
+  asyncHandler(async (_req, res) => {
+    res.json(await getDashboard());
+  }),
+);
+
+adminRouter.get(
+  "/analytics",
+  asyncHandler(async (_req, res) => {
+    res.json(await getAnalytics());
+  }),
+);
+
+adminRouter.get(
+  "/finance/summary",
+  asyncHandler(async (req, res) => {
+    const from = typeof req.query.from === "string" ? new Date(req.query.from) : undefined;
+    const to = typeof req.query.to === "string" ? new Date(req.query.to) : undefined;
+    res.json(await computePeriodMetrics({ from, to }));
+  }),
+);
+
+adminRouter.get(
+  "/manual-sales",
+  asyncHandler(async (_req, res) => {
+    res.json(await listManualSales());
+  }),
+);
+
+adminRouter.post(
+  "/manual-sales",
+  asyncHandler(async (req, res) => {
+    const body = manualSaleSchema.parse(req.body);
+    res.status(201).json(await createManualSale(body));
+  }),
+);
+
+adminRouter.get(
+  "/expenses",
+  asyncHandler(async (_req, res) => {
+    res.json(await listExpenses());
+  }),
+);
+
+adminRouter.post(
+  "/expenses",
+  asyncHandler(async (req, res) => {
+    const body = expenseSchema.parse(req.body);
+    res.status(201).json(
+      await createExpense({
+        ...body,
+        paymentSource: body.paymentSource ?? "CARD",
+      }),
+    );
+  }),
+);
+
+adminRouter.delete(
+  "/expenses/:id",
+  asyncHandler(async (req, res) => {
+    await deleteExpense(req.params.id);
+    res.status(204).send();
+  }),
+);
+
+adminRouter.get(
+  "/money/transactions",
+  asyncHandler(async (_req, res) => {
+    res.json(await listMoneyTransactions());
+  }),
+);
+
+adminRouter.post(
+  "/money/operations",
+  asyncHandler(async (req, res) => {
+    const body = moneyOperationSchema.parse(req.body);
+    res.status(201).json(await createMoneyOperation(body));
   }),
 );
