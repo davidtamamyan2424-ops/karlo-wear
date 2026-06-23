@@ -54,8 +54,20 @@ export interface Expense {
   createdAt: string;
 }
 
+export interface FinanceOverview {
+  period: PeriodMetrics;
+  businessBalance: number;
+  startingBalance: number;
+}
+
+export interface FinanceSettings {
+  startingBalance: number;
+  updatedAt: string;
+}
+
 export interface DashboardData {
   businessBalance: number;
+  startingBalance: number;
   totalStockUnits: number;
   inventoryValue: number;
   period: PeriodMetrics;

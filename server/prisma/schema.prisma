@@ -190,3 +190,10 @@ model Expense {
   comment   String?
   createdAt DateTime @default(now())
 }
+
+// Глобальные финансовые настройки (одна запись с id = "default").
+model FinanceSettings {
+  id              String   @id
+  startingBalance Int      @default(0) // копейки
+  updatedAt       DateTime @updatedAt
+}

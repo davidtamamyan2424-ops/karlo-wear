@@ -7,6 +7,7 @@ import {
 } from "../constants/finance.js";
 import { parseMonthQuery } from "../lib/period.js";
 import { productUnitCost } from "./stock.js";
+import { getStartingBalance } from "./adminFinanceSettings.js";
 
 export interface PeriodFilter {
   from?: Date;
@@ -168,12 +169,24 @@ export async function computePeriodMetrics(filter: PeriodFilter = {}): Promise<P
   return finalizeMetrics(m);
 }
 
-export async function computeBusinessBalance(): Promise<number> {
-  const monthly = await computeMonthlyBreakdown(120);
-  return monthly.reduce(
-    (sum, row) => sum + row.revenue - row.cogs - row.otherExpenses - row.ownerSalary,
+/** Текущий баланс: стартовый + продажи − прочие расходы − зарплата владельца (по месяцам). */
+export function calcBusinessBalance(
+  startingBalance: number,
+  monthly: Pick<PeriodMetrics, "revenue" | "otherExpenses" | "ownerSalary">[],
+): number {
+  const flow = monthly.reduce(
+    (sum, row) => sum + row.revenue - row.otherExpenses - row.ownerSalary,
     0,
   );
+  return startingBalance + flow;
+}
+
+export async function computeBusinessBalance(): Promise<number> {
+  const [startingBalance, monthly] = await Promise.all([
+    getStartingBalance(),
+    computeMonthlyBreakdown(120),
+  ]);
+  return calcBusinessBalance(startingBalance, monthly);
 }
 
 export async function computeInventoryValue() {
@@ -324,19 +337,36 @@ export async function computeSizeAndColorRankings(filter: PeriodFilter = {}) {
   };
 }
 
+export async function getFinanceOverview(month?: string) {
+  const period = parseMonthQuery(month);
+  const [periodMetrics, businessBalance, startingBalance] = await Promise.all([
+    computePeriodMetrics(period),
+    computeBusinessBalance(),
+    getStartingBalance(),
+  ]);
+
+  return {
+    period: periodMetrics,
+    businessBalance,
+    startingBalance,
+  };
+}
+
 export async function getDashboard(month?: string) {
   const period = parseMonthQuery(month);
   const endAt = period.to ?? new Date();
 
-  const [inventory, periodMetrics, businessBalance, monthly] = await Promise.all([
+  const [inventory, periodMetrics, businessBalance, startingBalance, monthly] = await Promise.all([
     computeInventoryValue(),
     computePeriodMetrics(period),
     computeBusinessBalance(),
+    getStartingBalance(),
     computeMonthlyBreakdown(6, endAt),
   ]);
 
   return {
     businessBalance,
+    startingBalance,
     totalStockUnits: inventory.totalUnits,
     inventoryValue: inventory.totalValue,
     period: periodMetrics,

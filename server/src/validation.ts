@@ -171,3 +171,7 @@ export const expenseSchema = z.object({
   amount: z.number().int().min(1),
   comment: z.string().trim().max(500).optional().nullable(),
 });
+
+export const financeSettingsSchema = z.object({
+  startingBalance: z.number().int().min(0),
+});

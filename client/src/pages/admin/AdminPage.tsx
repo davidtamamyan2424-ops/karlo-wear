@@ -11,6 +11,7 @@ import AdminSales from "./AdminSales";
 import AdminFinance from "./AdminFinance";
 import AdminAnalytics from "./AdminAnalytics";
 import AdminExpenses from "./AdminExpenses";
+import AdminFinanceSettings from "./AdminFinanceSettings";
 
 const TOKEN_KEY = "karlo-wear-admin-token";
 
@@ -23,6 +24,7 @@ type Tab =
   | "finance"
   | "analytics"
   | "expenses"
+  | "financeSettings"
   | "archive"
   | "accounts";
 
@@ -90,6 +92,7 @@ export default function AdminPage() {
     ["finance", ru.admin.tabs.finance],
     ["analytics", ru.admin.tabs.analytics],
     ["expenses", ru.admin.tabs.expenses],
+    ["financeSettings", ru.admin.tabs.financeSettings],
     ["archive", ru.admin.tabs.archive],
     ["accounts", ru.admin.tabs.paymentAccounts],
   ];
@@ -131,6 +134,7 @@ export default function AdminPage() {
       {tab === "finance" && <AdminFinance token={token} period={period} onPeriodChange={setPeriod} />}
       {tab === "analytics" && <AdminAnalytics token={token} period={period} onPeriodChange={setPeriod} />}
       {tab === "expenses" && <AdminExpenses token={token} />}
+      {tab === "financeSettings" && <AdminFinanceSettings token={token} />}
       {tab === "archive" && <AdminProducts token={token} archived />}
       {tab === "accounts" && <AdminPaymentAccounts token={token} />}
     </div>

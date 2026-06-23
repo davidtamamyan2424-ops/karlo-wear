@@ -13,6 +13,7 @@ import {
   updateProductSchema,
   manualSaleSchema,
   expenseSchema,
+  financeSettingsSchema,
 } from "../validation.js";
 import { listOrders, setOrderStatus } from "../services/orders.js";
 import {
@@ -37,11 +38,11 @@ import {
   getWarehouseStock,
   getDashboard,
   getAnalytics,
-  computePeriodMetrics,
+  getFinanceOverview,
 } from "../services/adminFinance.js";
+import { getFinanceSettings, updateFinanceSettings } from "../services/adminFinanceSettings.js";
 import { listManualSales, createManualSale } from "../services/adminManualSales.js";
 import { listExpenses, createExpense, deleteExpense } from "../services/adminExpenses.js";
-import { parseMonthQuery } from "../lib/period.js";
 import { uploadProductImages, uploadSizeChart } from "../lib/upload.js";
 import { UPLOADS_URL_PREFIX } from "../lib/uploads.js";
 
@@ -238,7 +239,22 @@ adminRouter.get(
   "/finance/summary",
   asyncHandler(async (req, res) => {
     const month = typeof req.query.month === "string" ? req.query.month : undefined;
-    res.json(await computePeriodMetrics(parseMonthQuery(month)));
+    res.json(await getFinanceOverview(month));
+  }),
+);
+
+adminRouter.get(
+  "/finance/settings",
+  asyncHandler(async (_req, res) => {
+    res.json(await getFinanceSettings());
+  }),
+);
+
+adminRouter.patch(
+  "/finance/settings",
+  asyncHandler(async (req, res) => {
+    const body = financeSettingsSchema.parse(req.body);
+    res.json(await updateFinanceSettings(body));
   }),
 );
 

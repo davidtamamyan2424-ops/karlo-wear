@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { adminFetchFinanceSummary } from "../../api/endpoints";
-import type { PeriodMetrics } from "../../types/crm";
+import type { FinanceOverview } from "../../types/crm";
 import { ru } from "../../i18n/ru";
 import { formatPrice } from "../../lib/format";
 import MetricCard from "../../components/admin/MetricCard";
@@ -14,17 +14,21 @@ interface Props {
 
 export default function AdminFinance({ token, period, onPeriodChange }: Props) {
   const t = ru.admin.crm;
-  const [summary, setSummary] = useState<PeriodMetrics | null>(null);
+  const [data, setData] = useState<FinanceOverview | null>(null);
 
   useEffect(() => {
-    void adminFetchFinanceSummary(token, period).then(setSummary);
+    void adminFetchFinanceSummary(token, period).then(setData);
   }, [token, period]);
 
-  if (!summary) return <p className="text-sm text-tg-hint">{ru.admin.loading}</p>;
+  if (!data) return <p className="text-sm text-tg-hint">{ru.admin.loading}</p>;
+
+  const summary = data.period;
 
   return (
     <div className="space-y-5">
       <PeriodSelector value={period} onChange={onPeriodChange} />
+
+      <MetricCard label={t.businessBalance} value={formatPrice(data.businessBalance)} large />
 
       <div className="grid grid-cols-2 gap-3">
         <MetricCard label={t.revenue} value={formatPrice(summary.revenue)} />

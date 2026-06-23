@@ -10,8 +10,9 @@ import type {
   AnalyticsData,
   DashboardData,
   Expense,
+  FinanceOverview,
+  FinanceSettings,
   ManualSale,
-  PeriodMetrics,
   WarehouseRow,
 } from "../types/crm";
 import type { OrderStatus } from "../constants";
@@ -233,9 +234,24 @@ export function adminFetchAnalytics(token: string, month?: string): Promise<Anal
   return apiRequest<AnalyticsData>(`/admin/analytics${query}`, { adminToken: token });
 }
 
-export function adminFetchFinanceSummary(token: string, month?: string): Promise<PeriodMetrics> {
+export function adminFetchFinanceSummary(token: string, month?: string): Promise<FinanceOverview> {
   const query = month ? `?month=${encodeURIComponent(month)}` : "";
-  return apiRequest<PeriodMetrics>(`/admin/finance/summary${query}`, { adminToken: token });
+  return apiRequest<FinanceOverview>(`/admin/finance/summary${query}`, { adminToken: token });
+}
+
+export function adminFetchFinanceSettings(token: string): Promise<FinanceSettings> {
+  return apiRequest<FinanceSettings>("/admin/finance/settings", { adminToken: token });
+}
+
+export function adminUpdateFinanceSettings(
+  token: string,
+  data: { startingBalance: number },
+): Promise<FinanceSettings> {
+  return apiRequest<FinanceSettings>("/admin/finance/settings", {
+    method: "PATCH",
+    body: data,
+    adminToken: token,
+  });
 }
 
 export function adminFetchWarehouse(token: string): Promise<WarehouseRow[]> {

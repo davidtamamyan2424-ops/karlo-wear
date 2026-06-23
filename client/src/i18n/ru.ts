@@ -147,6 +147,7 @@ export const ru = {
       finance: "Финансы",
       analytics: "Аналитика",
       expenses: "Расходы",
+      financeSettings: "Настройки",
       archive: "Архив",
     },
     filterByStatus: "Фильтр по статусу",
@@ -323,6 +324,12 @@ export const ru = {
       topByProfit: "ТОП моделей по прибыли",
       topSizes: "Самые продаваемые размеры",
       topColors: "Самые продаваемые цвета",
+      startingBalance: "Стартовый баланс бизнеса, ₽",
+      startingBalancePreview: "Стартовый баланс",
+      financeSettingsTitle: "Финансовые настройки",
+      financeSettingsHint:
+        "Сумма денег в бизнесе на момент запуска учёта. При изменении баланс пересчитывается автоматически.",
+      lastUpdated: "Обновлено",
     },
   },
   notifications: {
