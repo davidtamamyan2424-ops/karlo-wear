@@ -62,21 +62,12 @@ export const createOrderSchema = z
         message: "Подтвердите условия доставки",
       });
     }
-    if (data.deliveryMethod === "WILDBERRIES" || data.deliveryMethod === "OZON") {
+    if (data.deliveryMethod === "MOSCOW" || data.deliveryMethod === "MOSCOW_REGION") {
       if (!data.deliveryAddress || data.deliveryAddress.trim().length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["deliveryAddress"],
-          message: "Укажите адрес пункта выдачи",
-        });
-      }
-    }
-    if (data.deliveryMethod === "OTHER") {
-      if (!data.deliveryComment || data.deliveryComment.trim().length === 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["deliveryComment"],
-          message: "Укажите предпочтительный способ доставки",
+          message: "Укажите адрес доставки",
         });
       }
     }

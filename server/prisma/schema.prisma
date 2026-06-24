@@ -102,6 +102,7 @@ model Order {
   status        String      @default("AWAITING_PAYMENT")
   subtotalAmount Int
   discountAmount Int         @default(0)
+  deliveryAmount Int         @default(0)
   totalAmount   Int
   currency      String      @default("RUB")
   // Назначенный банк — фиксируется при создании заказа и больше не меняется.

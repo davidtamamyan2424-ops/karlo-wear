@@ -62,11 +62,18 @@ export const ALLOWED_PROOF_EXT = [".jpg", ".jpeg", ".png", ".pdf"] as const;
 export const PRODUCT_BADGES = ["NEW", "BESTSELLER", "LIMITED"] as const;
 export type ProductBadge = (typeof PRODUCT_BADGES)[number];
 
-// Способы доставки (стоимость считается вручную после оформления заказа).
-export const DELIVERY_METHODS = ["WILDBERRIES", "OZON", "OTHER"] as const;
+// Способы доставки.
+export const DELIVERY_METHODS = ["PICKUP", "MOSCOW", "MOSCOW_REGION", "OTHER_REGIONS"] as const;
 export type DeliveryMethod = (typeof DELIVERY_METHODS)[number];
 
 export const DELIVERY_METHOD_LABELS: Record<DeliveryMethod, string> = {
+  PICKUP: "Самовывоз",
+  MOSCOW: "Москва",
+  MOSCOW_REGION: "Ближайшее Подмосковье",
+  OTHER_REGIONS: "Другие регионы России",
+};
+
+export const LEGACY_DELIVERY_METHOD_LABELS: Record<string, string> = {
   WILDBERRIES: "Wildberries",
   OZON: "Ozon",
   OTHER: "Другое",

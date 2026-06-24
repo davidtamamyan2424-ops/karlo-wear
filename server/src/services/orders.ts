@@ -13,6 +13,8 @@ import {
   type OrderNotificationItem,
 } from "./telegram.js";
 import { calcCartPricing } from "../lib/promotions.js";
+import { calcDeliveryFee } from "../lib/delivery.js";
+import type { DeliveryMethod } from "../constants.js";
 
 const ORDER_NUMBER_START = 1000;
 
@@ -130,6 +132,8 @@ export async function createOrder(input: CreateOrderInput) {
     const pricing = calcCartPricing(
       lineItems.map((line) => ({ unitPrice: line.unitPrice, quantity: line.quantity })),
     );
+    const deliveryAmount =
+      calcDeliveryFee(input.deliveryMethod as DeliveryMethod, pricing) ?? 0;
 
     // 2. Генерируем номер заказа (атомарно в транзакции).
     const last = await tx.order.findFirst({
@@ -163,7 +167,8 @@ export async function createOrder(input: CreateOrderInput) {
         status: "AWAITING_PAYMENT",
         subtotalAmount: pricing.subtotal,
         discountAmount: pricing.discount,
-        totalAmount: pricing.total,
+        deliveryAmount,
+        totalAmount: pricing.total + deliveryAmount,
         currency: "RUB",
         paymentAccountId: account.id,
         assignedBankName: account.bankName,

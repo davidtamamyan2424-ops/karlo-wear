@@ -26,9 +26,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const show = useCallback<ToastContextValue["show"]>((message, variant = "success") => {
     const id = ++counter.current;
     setToasts((prev) => [...prev, { id, message, variant }]);
+    const duration = variant === "success" ? 1300 : 2400;
     window.setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 2400);
+    }, duration);
   }, []);
 
   return (

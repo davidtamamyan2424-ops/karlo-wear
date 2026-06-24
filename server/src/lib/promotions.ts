@@ -1,7 +1,7 @@
 /** 10% скидка на каждый второй товар. */
 export const SECOND_ITEM_DISCOUNT_RATE = 0.1;
 
-/** Порог бесплатной доставки (копейки). Проверяется до скидки. */
+/** Порог бесплатной курьерской доставки (копейки). Проверяется после скидки. */
 export const FREE_DELIVERY_THRESHOLD = 750_000;
 
 export interface CartLine {
@@ -28,7 +28,6 @@ export function expandUnitPrices(lines: CartLine[]): number[] {
   return units;
 }
 
-/** Скидка на floor(n/2) самых дешёвых единиц. */
 export function calcSecondItemDiscount(unitPrices: number[]): number {
   if (unitPrices.length < 2) return 0;
   const sorted = [...unitPrices].sort((a, b) => a - b);
@@ -45,8 +44,8 @@ export function calcCartPricing(lines: CartLine[]): CartPricing {
   const unitCount = lines.reduce((sum, line) => sum + line.quantity, 0);
   const discount = calcSecondItemDiscount(expandUnitPrices(lines));
   const total = subtotal - discount;
-  const qualifiesFreeDelivery = subtotal >= FREE_DELIVERY_THRESHOLD;
-  const freeDeliveryRemaining = Math.max(0, FREE_DELIVERY_THRESHOLD - subtotal);
+  const qualifiesFreeDelivery = total >= FREE_DELIVERY_THRESHOLD;
+  const freeDeliveryRemaining = Math.max(0, FREE_DELIVERY_THRESHOLD - total);
 
   return {
     subtotal,

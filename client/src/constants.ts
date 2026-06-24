@@ -10,11 +10,24 @@ export const PRODUCT_BADGE_LABELS: Record<ProductBadge, string> = {
   LIMITED: "Ограниченная серия",
 };
 
-export type DeliveryMethod = "WILDBERRIES" | "OZON" | "OTHER";
+export type DeliveryMethod = "PICKUP" | "MOSCOW" | "MOSCOW_REGION" | "OTHER_REGIONS";
 
-export const DELIVERY_METHODS: DeliveryMethod[] = ["WILDBERRIES", "OZON", "OTHER"];
+export const DELIVERY_METHODS: DeliveryMethod[] = [
+  "PICKUP",
+  "MOSCOW",
+  "MOSCOW_REGION",
+  "OTHER_REGIONS",
+];
 
 export const DELIVERY_METHOD_LABELS: Record<DeliveryMethod, string> = {
+  PICKUP: "Самовывоз",
+  MOSCOW: "Москва",
+  MOSCOW_REGION: "Ближайшее Подмосковье",
+  OTHER_REGIONS: "Другие регионы России",
+};
+
+/** Подписи для старых заказов. */
+export const LEGACY_DELIVERY_METHOD_LABELS: Record<string, string> = {
   WILDBERRIES: "Wildberries",
   OZON: "Ozon",
   OTHER: "Другое",

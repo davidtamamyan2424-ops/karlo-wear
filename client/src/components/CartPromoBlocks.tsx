@@ -33,10 +33,6 @@ export function CartPromoBlocks({ pricing }: PromoBlocksProps) {
           </p>
         </div>
       )}
-
-      {pricing.qualifiesFreeDelivery && (
-        <p className="text-center text-sm font-medium text-ink">{t.freeDeliveryApplied}</p>
-      )}
     </div>
   );
 }

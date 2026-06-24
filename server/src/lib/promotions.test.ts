@@ -18,14 +18,15 @@ describe("calcSecondItemDiscount", () => {
 });
 
 describe("calcCartPricing", () => {
-  it("qualifies free delivery before discount is applied", () => {
+  it("checks free delivery after discount is applied", () => {
     const pricing = calcCartPricing([
       { unitPrice: 380_000, quantity: 2 },
     ]);
     assert.equal(pricing.subtotal, 760_000);
     assert.equal(pricing.discount, 38_000);
     assert.equal(pricing.total, 722_000);
-    assert.equal(pricing.qualifiesFreeDelivery, true);
+    assert.equal(pricing.qualifiesFreeDelivery, false);
+    assert.equal(pricing.freeDeliveryRemaining, 28_000);
   });
 
   it("tracks remaining amount until free delivery", () => {

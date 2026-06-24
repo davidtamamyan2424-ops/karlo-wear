@@ -52,7 +52,7 @@ export default function PromoCarousel() {
 
   return (
     <section
-      className="mb-6 overflow-hidden rounded-card bg-ink text-white shadow-card"
+      className="mb-6 overflow-hidden rounded-card bg-surface shadow-card ring-1 ring-inset ring-line"
       aria-label={ru.promo.title}
       onPointerEnter={() => {
         paused.current = true;
@@ -63,31 +63,28 @@ export default function PromoCarousel() {
     >
       <div
         ref={containerRef}
-        className="relative touch-pan-y"
+        className="relative select-none touch-pan-y"
+        style={{ touchAction: "pan-y pinch-zoom" }}
         onPointerDown={handlePointerDown}
         onPointerMove={(e) => onPointerMove(e.clientX, e.clientY)}
         onPointerUp={handlePointerEnd}
         onPointerCancel={handlePointerEnd}
+        onDragStart={(e) => e.preventDefault()}
       >
-        <div
-          ref={trackRef}
-          className="flex will-change-transform"
-          style={{ width: `${slides.length * 100}%` }}
-        >
+        <div ref={trackRef} className="flex w-full will-change-transform">
           {slides.map((slide, i) => (
             <article
               key={slide.title}
               className="flex w-full shrink-0 flex-col justify-center px-5 py-6"
-              style={{ width: `${100 / slides.length}%` }}
               aria-hidden={i !== index}
             >
-              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/60">
+              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted">
                 {ru.promo.badge}
               </p>
-              <h2 className="mt-2 text-[22px] font-semibold leading-tight tracking-tight">
+              <h2 className="mt-2 text-[20px] font-semibold leading-tight tracking-tight text-ink">
                 {slide.title}
               </h2>
-              <p className="mt-2 max-w-sm text-sm leading-relaxed text-white/75">
+              <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted">
                 {slide.subtitle}
               </p>
             </article>
@@ -102,9 +99,10 @@ export default function PromoCarousel() {
                 type="button"
                 aria-label={`${ru.promo.goToSlide} ${i + 1}`}
                 onClick={() => goTo(i)}
+                onPointerDown={(e) => e.stopPropagation()}
                 className={[
                   "h-1.5 rounded-full transition-all",
-                  i === index ? "w-5 bg-white" : "w-1.5 bg-white/35",
+                  i === index ? "w-5 bg-ink" : "w-1.5 bg-line",
                 ].join(" ")}
               />
             ))}

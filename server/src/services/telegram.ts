@@ -5,6 +5,7 @@ import { formatRub } from "../lib/money.js";
 import { resolveUploadPath } from "../lib/uploads.js";
 import {
   DELIVERY_METHOD_LABELS,
+  LEGACY_DELIVERY_METHOD_LABELS,
   ORDER_STATUS_LABELS,
   type DeliveryMethod,
   type OrderStatus,
@@ -164,7 +165,9 @@ export async function notifyNewOrder(data: OrderNotificationData): Promise<void>
     .join("\n");
 
   const deliveryLabel = data.deliveryMethod
-    ? (DELIVERY_METHOD_LABELS[data.deliveryMethod as DeliveryMethod] ?? data.deliveryMethod)
+    ? (DELIVERY_METHOD_LABELS[data.deliveryMethod as DeliveryMethod] ??
+      LEGACY_DELIVERY_METHOD_LABELS[data.deliveryMethod] ??
+      data.deliveryMethod)
     : "—";
 
   const lines = [

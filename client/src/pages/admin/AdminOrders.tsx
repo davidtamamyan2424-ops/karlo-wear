@@ -3,6 +3,7 @@ import { ru } from "../../i18n/ru";
 import { formatPrice, formatPhone } from "../../lib/format";
 import {
   DELIVERY_METHOD_LABELS,
+  LEGACY_DELIVERY_METHOD_LABELS,
   ORDER_STATUS_BADGE,
   ORDER_STATUS_LABELS,
   type DeliveryMethod,
@@ -155,6 +156,7 @@ export default function AdminOrders({ token }: { token: string }) {
                 <span className="text-tg-hint">{ru.admin.order.deliveryMethod}: </span>
                 {order.deliveryMethod
                   ? (DELIVERY_METHOD_LABELS[order.deliveryMethod as DeliveryMethod] ??
+                     LEGACY_DELIVERY_METHOD_LABELS[order.deliveryMethod] ??
                      order.deliveryMethod)
                   : "—"}
               </p>
