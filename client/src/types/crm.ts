@@ -7,6 +7,8 @@ export interface PeriodMetrics {
   ownerSalary: number;
   developmentFunds: number;
   soldUnits: number;
+  orderCount: number;
+  averageOrderValue: number;
   freeIssues: number;
   ownerIssues: number;
   defectIssues: number;

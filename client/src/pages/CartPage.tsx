@@ -1,11 +1,13 @@
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { ru } from "../i18n/ru";
 import { formatPrice } from "../lib/format";
 import { useCart } from "../cart/CartContext";
 import { hapticSelection } from "../telegram/webapp";
+import CartPriceSummary from "../components/CartPriceSummary";
+import { CartPromoBlocks } from "../components/CartPromoBlocks";
 
 export default function CartPage() {
-  const { items, subtotal, total, setQuantity, removeItem } = useCart();
+  const { items, pricing, setQuantity, removeItem } = useCart();
   const navigate = useNavigate();
 
   if (items.length === 0) {
@@ -19,12 +21,13 @@ export default function CartPage() {
           </svg>
         </div>
         <p className="text-base font-medium text-ink">{ru.cart.empty}</p>
-        <Link
-          to="/"
+        <button
+          type="button"
+          onClick={() => navigate("/")}
           className="press mt-5 rounded-button bg-ink px-6 py-3 text-sm font-semibold text-white"
         >
           {ru.cart.continueShopping}
-        </Link>
+        </button>
       </div>
     );
   }
@@ -35,8 +38,10 @@ export default function CartPage() {
   };
 
   return (
-    <div className="animate-fade-in space-y-5">
+    <div className="animate-fade-in space-y-5 pb-28">
       <h1 className="px-1 text-[26px] font-semibold tracking-tight text-ink">{ru.cart.title}</h1>
+
+      <CartPromoBlocks pricing={pricing} />
 
       <ul className="space-y-3">
         {items.map((item) => (
@@ -104,16 +109,7 @@ export default function CartPage() {
         ))}
       </ul>
 
-      <div className="rounded-card bg-surface p-4 text-sm">
-        <div className="flex justify-between text-muted">
-          <span>{ru.cart.subtotal}</span>
-          <span>{formatPrice(subtotal)}</span>
-        </div>
-        <div className="mt-2 flex justify-between border-t border-line pt-2 text-base font-semibold text-ink">
-          <span>{ru.cart.total}</span>
-          <span>{formatPrice(total)}</span>
-        </div>
-      </div>
+      <CartPriceSummary pricing={pricing} />
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-paper/95 px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 backdrop-blur">
         <button

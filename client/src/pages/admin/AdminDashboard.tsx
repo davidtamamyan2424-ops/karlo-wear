@@ -28,19 +28,24 @@ export default function AdminDashboard({ token, period, onPeriodChange }: Props)
   if (error) return <p className="text-sm text-red-600">{error}</p>;
   if (!data) return <p className="text-sm text-tg-hint">{ru.admin.loading}</p>;
 
-  const chartItems = data.monthly.map((m) => ({
-    label: `${MONTH_NAMES[m.monthNum - 1]} ${m.year}`,
+  const monthLabel = (m: { monthNum: number; year: number }) =>
+    `${MONTH_NAMES[m.monthNum - 1]} ${m.year}`;
+
+  const revenueChart = data.monthly.map((m) => ({
+    label: monthLabel(m),
     value: m.revenue,
   }));
-
   const profitChart = data.monthly.map((m) => ({
-    label: `${MONTH_NAMES[m.monthNum - 1]} ${m.year}`,
+    label: monthLabel(m),
     value: m.netProfit,
   }));
-
-  const salesChart = data.monthly.map((m) => ({
-    label: `${MONTH_NAMES[m.monthNum - 1]} ${m.year}`,
-    value: m.soldUnits,
+  const ordersChart = data.monthly.map((m) => ({
+    label: monthLabel(m),
+    value: m.orderCount,
+  }));
+  const aovChart = data.monthly.map((m) => ({
+    label: monthLabel(m),
+    value: m.averageOrderValue,
   }));
 
   return (
@@ -50,12 +55,14 @@ export default function AdminDashboard({ token, period, onPeriodChange }: Props)
       <div className="grid grid-cols-2 gap-3">
         <MetricCard label={t.businessBalance} value={formatPrice(data.businessBalance)} large />
         <MetricCard label={t.moneyInGoods} value={formatPrice(data.inventoryValue)} large />
-        <MetricCard label={t.totalStock} value={`${data.totalStockUnits} шт.`} />
         <MetricCard label={t.monthRevenue} value={formatPrice(data.period.revenue)} />
         <MetricCard label={t.monthNetProfit} value={formatPrice(data.period.netProfit)} />
         <MetricCard label={t.monthExpenses} value={formatPrice(data.period.otherExpenses)} />
         <MetricCard label={t.ownerSalary} value={formatPrice(data.period.ownerSalary)} />
         <MetricCard label={t.developmentFunds} value={formatPrice(data.period.developmentFunds)} />
+        <MetricCard label={t.averageOrderValue} value={formatPrice(data.period.averageOrderValue)} />
+        <MetricCard label={t.orderCount} value={String(data.period.orderCount)} />
+        <MetricCard label={t.totalStock} value={`${data.totalStockUnits} шт.`} />
       </div>
 
       <div className="rounded-xl border border-black/10 bg-white p-4 text-sm">
@@ -68,18 +75,10 @@ export default function AdminDashboard({ token, period, onPeriodChange }: Props)
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-xl border border-black/10 bg-white p-4">
-          <h3 className="mb-3 text-sm font-semibold">{t.revenueChart}</h3>
-          <BarChart items={chartItems} formatValue={formatPrice} />
-        </div>
-        <div className="rounded-xl border border-black/10 bg-white p-4">
-          <h3 className="mb-3 text-sm font-semibold">{t.profitChart}</h3>
-          <BarChart items={profitChart} formatValue={formatPrice} color="#4b5563" />
-        </div>
-        <div className="rounded-xl border border-black/10 bg-white p-4 md:col-span-2">
-          <h3 className="mb-3 text-sm font-semibold">{t.salesChart}</h3>
-          <BarChart items={salesChart} color="#6b7280" />
-        </div>
+        <ChartBlock title={t.revenueChart} items={revenueChart} formatValue={formatPrice} />
+        <ChartBlock title={t.profitChart} items={profitChart} formatValue={formatPrice} color="#4b5563" />
+        <ChartBlock title={t.ordersChart} items={ordersChart} color="#6b7280" />
+        <ChartBlock title={t.aovChart} items={aovChart} formatValue={formatPrice} color="#9ca3af" />
       </div>
 
       {data.inventoryByProduct.length > 0 && (
@@ -97,6 +96,25 @@ export default function AdminDashboard({ token, period, onPeriodChange }: Props)
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ChartBlock({
+  title,
+  items,
+  formatValue,
+  color,
+}: {
+  title: string;
+  items: { label: string; value: number }[];
+  formatValue?: (v: number) => string;
+  color?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-black/10 bg-white p-4">
+      <h3 className="mb-3 text-sm font-semibold">{title}</h3>
+      <BarChart items={items} formatValue={formatValue} color={color} />
     </div>
   );
 }

@@ -88,6 +88,8 @@ export interface PeriodMetrics {
   ownerSalary: number;
   developmentFunds: number;
   soldUnits: number;
+  orderCount: number;
+  averageOrderValue: number;
   freeIssues: number;
   ownerIssues: number;
   defectIssues: number;
@@ -103,6 +105,8 @@ export function emptyMetrics(): PeriodMetrics {
     ownerSalary: 0,
     developmentFunds: 0,
     soldUnits: 0,
+    orderCount: 0,
+    averageOrderValue: 0,
     freeIssues: 0,
     ownerIssues: 0,
     defectIssues: 0,
@@ -135,20 +139,25 @@ function applyManualSaleMetrics(
   }
 }
 
-function finalizeMetrics(m: PeriodMetrics): PeriodMetrics {
+function finalizeMetrics(m: PeriodMetrics, orderRevenue = 0): PeriodMetrics {
   m.grossProfit = m.revenue - m.cogs;
   m.netProfit = m.grossProfit - m.otherExpenses;
   m.ownerSalary = calcOwnerSalary(m.netProfit);
   m.developmentFunds = m.netProfit - m.ownerSalary;
+  m.averageOrderValue =
+    m.orderCount > 0 ? Math.round(orderRevenue / m.orderCount) : 0;
   return m;
 }
 
 export async function computePeriodMetrics(filter: PeriodFilter = {}): Promise<PeriodMetrics> {
   const { orders, manualSales, expenses } = await loadFinanceData();
   const m = emptyMetrics();
+  let orderRevenue = 0;
 
   for (const order of orders) {
     if (!inPeriod(order.createdAt, filter)) continue;
+    m.orderCount += 1;
+    orderRevenue += order.totalAmount;
     m.revenue += order.totalAmount;
     m.cogs += orderCogs(order.items);
     for (const item of order.items) {
@@ -166,7 +175,7 @@ export async function computePeriodMetrics(filter: PeriodFilter = {}): Promise<P
     m.otherExpenses += expense.amount;
   }
 
-  return finalizeMetrics(m);
+  return finalizeMetrics(m, orderRevenue);
 }
 
 /** Текущий баланс: стартовый + продажи − прочие расходы − зарплата владельца (по месяцам). */
@@ -218,6 +227,7 @@ export async function computeInventoryValue() {
 export async function computeMonthlyBreakdown(months = 12, endAt?: Date) {
   const { orders, manualSales, expenses } = await loadFinanceData();
   const buckets = new Map<string, PeriodMetrics>();
+  const orderRevenueByMonth = new Map<string, number>();
 
   const touch = (key: string) => {
     if (!buckets.has(key)) buckets.set(key, emptyMetrics());
@@ -227,6 +237,8 @@ export async function computeMonthlyBreakdown(months = 12, endAt?: Date) {
   for (const order of orders) {
     const key = monthKey(order.createdAt);
     const m = touch(key);
+    m.orderCount += 1;
+    orderRevenueByMonth.set(key, (orderRevenueByMonth.get(key) ?? 0) + order.totalAmount);
     m.revenue += order.totalAmount;
     m.cogs += orderCogs(order.items);
     for (const item of order.items) m.soldUnits += item.quantity;
@@ -250,7 +262,7 @@ export async function computeMonthlyBreakdown(months = 12, endAt?: Date) {
   const keys = allKeys.slice(Math.max(0, sliceEnd - months), sliceEnd);
 
   return keys.map((key) => {
-    const m = finalizeMetrics({ ...buckets.get(key)! });
+    const m = finalizeMetrics({ ...buckets.get(key)! }, orderRevenueByMonth.get(key) ?? 0);
     const [year, month] = key.split("-");
     return { month: key, year: Number(year), monthNum: Number(month), ...m };
   });

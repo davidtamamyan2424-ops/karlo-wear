@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { Product } from "../types";
 import type { Size } from "../constants";
+import { calcCartPricing, type CartPricing } from "../lib/promotions";
 
 export interface CartItem {
   key: string; // productId__variantId__size
@@ -28,7 +29,9 @@ interface CartContextValue {
   items: CartItem[];
   count: number;
   subtotal: number;
+  discount: number;
   total: number;
+  pricing: CartPricing;
   /** Добавляет товар. Возвращает false, если достигнут лимит склада. */
   addItem: (product: Product, size: Size, quantity?: number, variantId?: string) => boolean;
   setQuantity: (key: string, quantity: number) => void;
@@ -127,13 +130,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const clear = useCallback(() => setItems([]), []);
 
   const value = useMemo<CartContextValue>(() => {
-    const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-    const count = items.reduce((sum, i) => sum + i.quantity, 0);
+    const lines = items.map((i) => ({ unitPrice: i.price, quantity: i.quantity }));
+    const pricing = calcCartPricing(lines);
+    const count = pricing.unitCount;
     return {
       items,
       count,
-      subtotal,
-      total: subtotal,
+      subtotal: pricing.subtotal,
+      discount: pricing.discount,
+      total: pricing.total,
+      pricing,
       addItem,
       setQuantity,
       removeItem,

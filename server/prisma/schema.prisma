@@ -100,6 +100,8 @@ model Order {
   comment       String? // Комментарий к заказу
   // Статус заказа (см. ORDER_STATUSES в src/constants.ts; храним строкой).
   status        String      @default("AWAITING_PAYMENT")
+  subtotalAmount Int
+  discountAmount Int         @default(0)
   totalAmount   Int
   currency      String      @default("RUB")
   // Назначенный банк — фиксируется при создании заказа и больше не меняется.

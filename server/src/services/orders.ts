@@ -12,6 +12,7 @@ import {
   notifyNewReceipt,
   type OrderNotificationItem,
 } from "./telegram.js";
+import { calcCartPricing } from "../lib/promotions.js";
 
 const ORDER_NUMBER_START = 1000;
 
@@ -126,9 +127,8 @@ export async function createOrder(input: CreateOrderInput) {
       });
     }
 
-    const totalAmount = lineItems.reduce(
-      (sum, line) => sum + line.unitPrice * line.quantity,
-      0,
+    const pricing = calcCartPricing(
+      lineItems.map((line) => ({ unitPrice: line.unitPrice, quantity: line.quantity })),
     );
 
     // 2. Генерируем номер заказа (атомарно в транзакции).
@@ -161,7 +161,9 @@ export async function createOrder(input: CreateOrderInput) {
         deliveryComment: input.deliveryComment ?? null,
         deliveryConfirmed: input.deliveryConfirmed,
         status: "AWAITING_PAYMENT",
-        totalAmount,
+        subtotalAmount: pricing.subtotal,
+        discountAmount: pricing.discount,
+        totalAmount: pricing.total,
         currency: "RUB",
         paymentAccountId: account.id,
         assignedBankName: account.bankName,

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchProducts } from "../api/endpoints";
 import { ru } from "../i18n/ru";
 import ProductCard from "../components/ProductCard";
+import PromoCarousel from "../components/PromoCarousel";
 import { expandCatalog } from "../lib/catalog";
 
 function Skeleton() {
@@ -39,12 +40,14 @@ export default function CatalogPage() {
 
   return (
     <div className="animate-fade-in">
-      <header className="px-1 pb-5 pt-1">
+      <header className="px-1 pb-2 pt-1">
         <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-ink">
           {ru.catalog.title}
         </h1>
         <p className="mt-1 text-sm text-muted">Новая коллекция</p>
       </header>
+
+      <PromoCarousel />
 
       {error && <p className="py-8 text-center text-sm text-red-600">{error}</p>}
 

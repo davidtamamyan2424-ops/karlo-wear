@@ -26,9 +26,9 @@ export default function AdminAnalytics({ token, period, onPeriodChange }: Props)
   const monthLabel = (m: { monthNum: number; year: number }) =>
     `${MONTH_NAMES[m.monthNum - 1]} ${m.year}`;
 
-  const salesChart = data.monthly.map((m) => ({
+  const aovChart = data.monthly.map((m) => ({
     label: monthLabel(m),
-    value: m.soldUnits,
+    value: m.averageOrderValue,
   }));
   const revenueChart = data.monthly.map((m) => ({
     label: monthLabel(m),
@@ -38,9 +38,9 @@ export default function AdminAnalytics({ token, period, onPeriodChange }: Props)
     label: monthLabel(m),
     value: m.netProfit,
   }));
-  const expenseChart = data.monthly.map((m) => ({
+  const ordersChart = data.monthly.map((m) => ({
     label: monthLabel(m),
-    value: m.otherExpenses,
+    value: m.orderCount,
   }));
 
   const rank = (items: { model: string; units?: number; profit?: number }[], key: "units" | "profit") =>
@@ -54,10 +54,10 @@ export default function AdminAnalytics({ token, period, onPeriodChange }: Props)
       <PeriodSelector value={period} onChange={onPeriodChange} />
 
       <div className="grid gap-4 md:grid-cols-2">
-        <ChartBlock title={t.salesChart} items={salesChart} />
+        <ChartBlock title={t.aovChart} items={aovChart} formatValue={formatPrice} />
         <ChartBlock title={t.revenueChart} items={revenueChart} formatValue={formatPrice} />
         <ChartBlock title={t.profitChart} items={profitChart} formatValue={formatPrice} color="#4b5563" />
-        <ChartBlock title={t.expensesChart} items={expenseChart} formatValue={formatPrice} color="#9ca3af" />
+        <ChartBlock title={t.ordersChart} items={ordersChart} color="#6b7280" />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

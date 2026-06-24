@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { ru } from "../i18n/ru";
-import { formatPrice } from "../lib/format";
 import { isCompleteRuPhone, normalizeRuPhone } from "../lib/phone";
 import { useCart } from "../cart/CartContext";
 import { createOrder } from "../api/endpoints";
@@ -9,6 +8,8 @@ import { getTelegramUser, hapticSelection } from "../telegram/webapp";
 import { ApiError } from "../api/client";
 import PhoneInput from "../components/PhoneInput";
 import LegalConsentCheckbox from "../components/LegalConsentCheckbox";
+import CartPriceSummary from "../components/CartPriceSummary";
+import { CartPromoBlocks } from "../components/CartPromoBlocks";
 import {
   DELIVERY_METHODS,
   DELIVERY_METHOD_LABELS,
@@ -16,7 +17,7 @@ import {
 } from "../constants";
 
 export default function CheckoutPage() {
-  const { items, total, clear } = useCart();
+  const { items, pricing, clear } = useCart();
   const navigate = useNavigate();
 
   const [name, setName] = useState("");
@@ -183,8 +184,18 @@ export default function CheckoutPage() {
       </label>
 
       {/* Доставка */}
-      <section className="space-y-3 rounded-card bg-surface p-4">
+      <section className="space-y-4 rounded-card bg-surface p-4">
         <h2 className="text-base font-semibold text-ink">{d.title}</h2>
+
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-ink">{d.regionsTitle}</h3>
+          {d.regions.map((region) => (
+            <div key={region.title} className="rounded-button bg-paper px-4 py-3 ring-1 ring-inset ring-line">
+              <p className="text-sm font-semibold text-ink">{region.title}</p>
+              <p className="mt-1 text-sm leading-relaxed text-muted">{region.text}</p>
+            </div>
+          ))}
+        </div>
 
         <div>
           <span className="mb-1.5 block text-sm font-medium text-ink">{d.method}</span>
@@ -267,9 +278,9 @@ export default function CheckoutPage() {
       </section>
 
       {/* Уведомление о доставке */}
-      <section className="space-y-3 rounded-card bg-amber-50 p-4 ring-1 ring-inset ring-amber-200">
-        <h2 className="text-sm font-semibold text-amber-900">{d.noticeTitle}</h2>
-        <ul className="space-y-1.5 text-sm text-amber-900/90">
+      <section className="space-y-3 rounded-card bg-paper p-4 ring-1 ring-inset ring-line">
+        <h2 className="text-sm font-semibold text-ink">{d.noticeTitle}</h2>
+        <ul className="space-y-1.5 text-sm text-muted">
           {d.noticeLines.map((line) => (
             <li key={line} className="flex gap-2">
               <span aria-hidden>•</span>
@@ -285,9 +296,9 @@ export default function CheckoutPage() {
               setDeliveryAck(e.target.checked);
               if (e.target.checked) setErrors((prev) => ({ ...prev, deliveryAck: "" }));
             }}
-            className="mt-0.5 h-4 w-4 shrink-0 rounded border-amber-400 text-ink accent-ink"
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-line text-ink accent-ink"
           />
-          <span className="text-sm font-medium text-amber-900">{d.acknowledge}</span>
+          <span className="text-sm font-medium text-ink">{d.acknowledge}</span>
         </label>
         {errors.deliveryAck && (
           <span className="block text-xs text-red-600">{errors.deliveryAck}</span>
@@ -305,12 +316,9 @@ export default function CheckoutPage() {
         />
       </section>
 
-      <div className="rounded-card bg-surface p-4">
-        <div className="flex justify-between text-base font-semibold text-ink">
-          <span>{ru.cart.total}</span>
-          <span>{formatPrice(total)}</span>
-        </div>
-      </div>
+      <CartPromoBlocks pricing={pricing} />
+
+      <CartPriceSummary pricing={pricing} />
 
       {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
