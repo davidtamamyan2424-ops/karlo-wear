@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { Product } from "../types";
 import type { Size } from "../constants";
+import type { DeliveryMethod } from "../constants";
 import { calcCartPricing, type CartPricing } from "../lib/promotions";
 
 export interface CartItem {
@@ -32,6 +33,8 @@ interface CartContextValue {
   discount: number;
   total: number;
   pricing: CartPricing;
+  deliveryMethod: DeliveryMethod;
+  setDeliveryMethod: (method: DeliveryMethod) => void;
   /** Добавляет товар. Возвращает false, если достигнут лимит склада. */
   addItem: (product: Product, size: Size, quantity?: number, variantId?: string) => boolean;
   setQuantity: (key: string, quantity: number) => void;
@@ -40,6 +43,7 @@ interface CartContextValue {
 }
 
 const STORAGE_KEY = "karlo-wear-cart";
+const DELIVERY_STORAGE_KEY = "karlo-wear-delivery-method";
 
 const CartContext = createContext<CartContextValue | null>(null);
 
@@ -58,12 +62,33 @@ function loadCart(): CartItem[] {
   }
 }
 
+function loadDeliveryMethod(): DeliveryMethod {
+  try {
+    const raw = localStorage.getItem(DELIVERY_STORAGE_KEY);
+    if (raw === "PICKUP" || raw === "MOSCOW" || raw === "MOSCOW_REGION" || raw === "OTHER_REGIONS") {
+      return raw;
+    }
+  } catch {
+    /* noop */
+  }
+  return "PICKUP";
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>(loadCart);
+  const [deliveryMethod, setDeliveryMethodState] = useState<DeliveryMethod>(loadDeliveryMethod);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   }, [items]);
+
+  useEffect(() => {
+    localStorage.setItem(DELIVERY_STORAGE_KEY, deliveryMethod);
+  }, [deliveryMethod]);
+
+  const setDeliveryMethod = useCallback((method: DeliveryMethod) => {
+    setDeliveryMethodState(method);
+  }, []);
 
   const addItem = useCallback<CartContextValue["addItem"]>((product, size, quantity = 1, variantId) => {
     const variant =
@@ -140,12 +165,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
       discount: pricing.discount,
       total: pricing.total,
       pricing,
+      deliveryMethod,
+      setDeliveryMethod,
       addItem,
       setQuantity,
       removeItem,
       clear,
     };
-  }, [items, addItem, setQuantity, removeItem, clear]);
+  }, [items, deliveryMethod, setDeliveryMethod, addItem, setQuantity, removeItem, clear]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

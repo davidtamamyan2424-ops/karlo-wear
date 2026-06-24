@@ -1,14 +1,22 @@
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ru } from "../i18n/ru";
 import { formatPrice } from "../lib/format";
 import { useCart } from "../cart/CartContext";
 import { hapticSelection } from "../telegram/webapp";
 import CartPriceSummary from "../components/CartPriceSummary";
+import DeliveryMethodPicker from "../components/DeliveryMethodPicker";
 import { CartPromoBlocks } from "../components/CartPromoBlocks";
+import { calcDeliveryFee } from "../lib/delivery";
 
 export default function CartPage() {
-  const { items, pricing, setQuantity, removeItem } = useCart();
+  const { items, pricing, deliveryMethod, setDeliveryMethod, setQuantity, removeItem } = useCart();
   const navigate = useNavigate();
+
+  const deliveryFee = useMemo(
+    () => calcDeliveryFee(deliveryMethod, pricing),
+    [deliveryMethod, pricing],
+  );
 
   if (items.length === 0) {
     return (
@@ -109,7 +117,14 @@ export default function CartPage() {
         ))}
       </ul>
 
-      <CartPriceSummary pricing={pricing} />
+      <DeliveryMethodPicker
+        value={deliveryMethod}
+        onChange={setDeliveryMethod}
+        pricing={pricing}
+        compact
+      />
+
+      <CartPriceSummary pricing={pricing} deliveryFee={deliveryFee} />
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-paper/95 px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 backdrop-blur">
         <button

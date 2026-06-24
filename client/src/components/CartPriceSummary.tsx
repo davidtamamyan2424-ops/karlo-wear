@@ -5,8 +5,7 @@ import { calcGrandTotal } from "../lib/delivery";
 
 interface Props {
   pricing: CartPricing;
-  deliveryFee?: number | null;
-  showGrandTotal?: boolean;
+  deliveryFee: number | null;
 }
 
 function formatDeliveryFee(fee: number | null): string {
@@ -15,14 +14,9 @@ function formatDeliveryFee(fee: number | null): string {
   return formatPrice(fee);
 }
 
-export default function CartPriceSummary({
-  pricing,
-  deliveryFee,
-  showGrandTotal = false,
-}: Props) {
+export default function CartPriceSummary({ pricing, deliveryFee }: Props) {
   const t = ru.cart;
-  const hasDelivery = deliveryFee !== undefined;
-  const grandTotal = hasDelivery ? calcGrandTotal(pricing.total, deliveryFee ?? null) : pricing.total;
+  const grandTotal = calcGrandTotal(pricing.total, deliveryFee);
 
   return (
     <div className="space-y-2.5 rounded-card bg-surface p-4 text-sm">
@@ -31,22 +25,20 @@ export default function CartPriceSummary({
         <span>{formatPrice(pricing.subtotal)}</span>
       </div>
 
-      {pricing.discount > 0 && (
-        <div className="flex justify-between text-emerald-700">
-          <span>{t.yourSavings}</span>
-          <span className="font-medium">−{formatPrice(pricing.discount)}</span>
-        </div>
-      )}
+      <div className="flex justify-between text-muted">
+        <span>{t.discount}</span>
+        <span className={pricing.discount > 0 ? "font-medium text-emerald-700" : ""}>
+          {pricing.discount > 0 ? `−${formatPrice(pricing.discount)}` : formatPrice(0)}
+        </span>
+      </div>
 
-      {hasDelivery && deliveryFee !== undefined && (
-        <div className="flex justify-between text-muted">
-          <span>{t.delivery}</span>
-          <span>{formatDeliveryFee(deliveryFee)}</span>
-        </div>
-      )}
+      <div className="flex justify-between text-muted">
+        <span>{t.deliveryCost}</span>
+        <span>{formatDeliveryFee(deliveryFee)}</span>
+      </div>
 
       <div className="flex justify-between border-t border-line pt-2.5 text-base font-semibold text-ink">
-        <span>{showGrandTotal ? t.grandTotal : t.total}</span>
+        <span>{t.grandTotal}</span>
         <span>{formatPrice(grandTotal)}</span>
       </div>
     </div>

@@ -4,21 +4,17 @@ import { ru } from "../i18n/ru";
 import { isCompleteRuPhone, normalizeRuPhone } from "../lib/phone";
 import { useCart } from "../cart/CartContext";
 import { createOrder } from "../api/endpoints";
-import { getTelegramUser, hapticSelection } from "../telegram/webapp";
+import { getTelegramUser } from "../telegram/webapp";
 import { ApiError } from "../api/client";
 import PhoneInput from "../components/PhoneInput";
 import LegalConsentCheckbox from "../components/LegalConsentCheckbox";
 import CartPriceSummary from "../components/CartPriceSummary";
+import DeliveryMethodPicker from "../components/DeliveryMethodPicker";
 import { CartPromoBlocks } from "../components/CartPromoBlocks";
-import {
-  DELIVERY_METHODS,
-  DELIVERY_METHOD_LABELS,
-  type DeliveryMethod,
-} from "../constants";
 import { calcDeliveryFee } from "../lib/delivery";
 
 export default function CheckoutPage() {
-  const { items, pricing, clear } = useCart();
+  const { items, pricing, deliveryMethod, setDeliveryMethod, clear } = useCart();
   const navigate = useNavigate();
 
   const [name, setName] = useState("");
@@ -28,7 +24,6 @@ export default function CheckoutPage() {
   const [city, setCity] = useState("");
   const [comment, setComment] = useState("");
 
-  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod | "">("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryAck, setDeliveryAck] = useState(false);
   const [legalConsent, setLegalConsent] = useState(false);
@@ -38,7 +33,7 @@ export default function CheckoutPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const deliveryFee = useMemo(
-    () => (deliveryMethod ? calcDeliveryFee(deliveryMethod, pricing) : undefined),
+    () => calcDeliveryFee(deliveryMethod, pricing),
     [deliveryMethod, pricing],
   );
 
@@ -64,9 +59,7 @@ export default function CheckoutPage() {
     const username = telegram.trim().replace(/^@/, "");
     if (!username) next.telegram = ru.validation.telegramRequired;
     if (!city.trim()) next.city = ru.validation.cityRequired;
-    if (!deliveryMethod) {
-      next.deliveryMethod = ru.validation.deliveryMethodRequired;
-    } else if (needsAddress && !deliveryAddress.trim()) {
+    if (needsAddress && !deliveryAddress.trim()) {
       next.deliveryAddress = ru.validation.deliveryAddressRequired;
     }
     if (!deliveryAck) next.deliveryAck = ru.validation.deliveryNotConfirmed;
@@ -78,7 +71,7 @@ export default function CheckoutPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
-    if (!validate() || !deliveryMethod) return;
+    if (!validate()) return;
 
     const normalizedPhone = normalizeRuPhone(phone);
     const username = telegram.trim().replace(/^@/, "");
@@ -145,14 +138,6 @@ export default function CheckoutPage() {
 
   const d = ru.checkout.delivery;
 
-  const deliveryPriceLabel = (method: DeliveryMethod): string => {
-    if (method === "PICKUP") return d.optionPrices.PICKUP;
-    if (method === "OTHER_REGIONS") return d.optionPrices.OTHER_REGIONS;
-    const fee = calcDeliveryFee(method, pricing);
-    if (fee === 0) return ru.cart.deliveryFree;
-    return d.optionPrices[method];
-  };
-
   return (
     <form onSubmit={handleSubmit} className="animate-fade-in space-y-4 pb-28">
       <h1 className="px-1 text-[26px] font-semibold tracking-tight text-ink">
@@ -190,66 +175,33 @@ export default function CheckoutPage() {
         />
       </label>
 
-      <section className="space-y-3 rounded-card bg-surface p-4">
-        <h2 className="text-base font-semibold text-ink">{d.title}</h2>
-        <p className="text-sm text-muted">{d.method}</p>
+      <DeliveryMethodPicker
+        value={deliveryMethod}
+        onChange={(method) => {
+          setDeliveryMethod(method);
+          setErrors((prev) => ({
+            ...prev,
+            deliveryAddress: "",
+          }));
+        }}
+        pricing={pricing}
+      />
 
-        <div className="space-y-2">
-          {DELIVERY_METHODS.map((method) => {
-            const active = deliveryMethod === method;
-            return (
-              <button
-                key={method}
-                type="button"
-                onClick={() => {
-                  hapticSelection();
-                  setDeliveryMethod(method);
-                  setErrors((prev) => ({
-                    ...prev,
-                    deliveryMethod: "",
-                    deliveryAddress: "",
-                  }));
-                }}
-                className={[
-                  "press w-full rounded-button px-4 py-3 text-left transition",
-                  active
-                    ? "bg-ink text-white shadow-soft"
-                    : "bg-paper text-ink ring-1 ring-inset ring-line",
-                ].join(" ")}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <span className="text-sm font-semibold">{DELIVERY_METHOD_LABELS[method]}</span>
-                  <span className={`shrink-0 text-sm font-medium ${active ? "text-white/90" : "text-muted"}`}>
-                    {deliveryPriceLabel(method)}
-                  </span>
-                </div>
-                <p className={`mt-1 text-sm leading-relaxed ${active ? "text-white/75" : "text-muted"}`}>
-                  {d.optionDescriptions[method]}
-                </p>
-              </button>
-            );
-          })}
-        </div>
-        {errors.deliveryMethod && (
-          <span className="block text-xs text-red-600">{errors.deliveryMethod}</span>
-        )}
-
-        {needsAddress && (
-          <label className="block pt-1">
-            <span className="mb-1.5 block text-sm font-medium text-ink">{d.address}</span>
-            <input
-              type="text"
-              value={deliveryAddress}
-              onChange={(e) => setDeliveryAddress(e.target.value)}
-              placeholder={d.addressPlaceholder}
-              className={inputClass}
-            />
-            {errors.deliveryAddress && (
-              <span className="mt-1 block text-xs text-red-600">{errors.deliveryAddress}</span>
-            )}
-          </label>
-        )}
-      </section>
+      {needsAddress && (
+        <label className="block">
+          <span className="mb-1.5 block text-sm font-medium text-ink">{d.address}</span>
+          <input
+            type="text"
+            value={deliveryAddress}
+            onChange={(e) => setDeliveryAddress(e.target.value)}
+            placeholder={d.addressPlaceholder}
+            className={inputClass}
+          />
+          {errors.deliveryAddress && (
+            <span className="mt-1 block text-xs text-red-600">{errors.deliveryAddress}</span>
+          )}
+        </label>
+      )}
 
       <section className="space-y-3 rounded-card bg-paper p-4 ring-1 ring-inset ring-line">
         <h2 className="text-sm font-semibold text-ink">{d.noticeTitle}</h2>
@@ -291,11 +243,7 @@ export default function CheckoutPage() {
 
       <CartPromoBlocks pricing={pricing} />
 
-      <CartPriceSummary
-        pricing={pricing}
-        deliveryFee={deliveryFee}
-        showGrandTotal={Boolean(deliveryMethod)}
-      />
+      <CartPriceSummary pricing={pricing} deliveryFee={deliveryFee} />
 
       {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 

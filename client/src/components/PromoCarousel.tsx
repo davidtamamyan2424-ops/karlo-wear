@@ -29,8 +29,17 @@ export default function PromoCarousel() {
     return () => window.clearInterval(timer);
   }, [index, goTo, slides.length]);
 
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const blockSelect = (e: Event) => e.preventDefault();
+    el.addEventListener("selectstart", blockSelect);
+    return () => el.removeEventListener("selectstart", blockSelect);
+  }, [containerRef]);
+
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    e.preventDefault();
     paused.current = true;
     onPointerDown(e.clientX, e.clientY, e.pointerId);
     try {
@@ -52,7 +61,7 @@ export default function PromoCarousel() {
 
   return (
     <section
-      className="mb-6 overflow-hidden rounded-card bg-surface shadow-card ring-1 ring-inset ring-line"
+      className="mb-6 overflow-hidden rounded-card border border-[#ebe4da] bg-gradient-to-br from-[#fdfbf7] via-card to-[#f3ede4] shadow-card"
       aria-label={ru.promo.title}
       onPointerEnter={() => {
         paused.current = true;
@@ -64,7 +73,7 @@ export default function PromoCarousel() {
       <div
         ref={containerRef}
         className="relative select-none touch-pan-y"
-        style={{ touchAction: "pan-y pinch-zoom" }}
+        style={{ touchAction: "pan-y pinch-zoom", userSelect: "none", WebkitUserSelect: "none" }}
         onPointerDown={handlePointerDown}
         onPointerMove={(e) => onPointerMove(e.clientX, e.clientY)}
         onPointerUp={handlePointerEnd}
@@ -75,16 +84,17 @@ export default function PromoCarousel() {
           {slides.map((slide, i) => (
             <article
               key={slide.title}
-              className="flex w-full shrink-0 flex-col justify-center px-5 py-6"
+              className="flex min-h-[132px] w-full shrink-0 select-none flex-col justify-center px-5 py-6 pb-8"
+              style={{ userSelect: "none", WebkitUserSelect: "none" }}
               aria-hidden={i !== index}
             >
-              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted">
+              <p className="select-none text-[11px] font-medium uppercase tracking-[0.18em] text-muted">
                 {ru.promo.badge}
               </p>
-              <h2 className="mt-2 text-[20px] font-semibold leading-tight tracking-tight text-ink">
+              <h2 className="mt-2 select-none text-[20px] font-semibold leading-tight tracking-tight text-ink">
                 {slide.title}
               </h2>
-              <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted">
+              <p className="mt-2 max-w-sm select-none text-sm leading-relaxed text-muted">
                 {slide.subtitle}
               </p>
             </article>
@@ -92,7 +102,7 @@ export default function PromoCarousel() {
         </div>
 
         {slides.length > 1 && (
-          <div className="absolute inset-x-0 bottom-3 flex justify-center gap-1.5">
+          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center gap-1.5">
             {slides.map((slide, i) => (
               <button
                 key={slide.title}
@@ -101,8 +111,8 @@ export default function PromoCarousel() {
                 onClick={() => goTo(i)}
                 onPointerDown={(e) => e.stopPropagation()}
                 className={[
-                  "h-1.5 rounded-full transition-all",
-                  i === index ? "w-5 bg-ink" : "w-1.5 bg-line",
+                  "pointer-events-auto h-1.5 rounded-full transition-all",
+                  i === index ? "w-5 bg-ink/80" : "w-1.5 bg-[#d8d0c6]",
                 ].join(" ")}
               />
             ))}

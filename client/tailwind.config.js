@@ -66,6 +66,10 @@ export default {
           "0%": { opacity: "0", transform: "translateY(16px) scale(0.98)" },
           "100%": { opacity: "1", transform: "translateY(0) scale(1)" },
         },
+        "toast-out": {
+          "0%": { opacity: "1", transform: "translateY(0) scale(1)" },
+          "100%": { opacity: "0", transform: "translateY(8px) scale(0.98)" },
+        },
         "check-pop": {
           "0%": { transform: "scale(0.6)", opacity: "0" },
           "60%": { transform: "scale(1.15)", opacity: "1" },
@@ -77,6 +81,7 @@ export default {
         "fade-in": "fade-in 0.3s ease both",
         "badge-pop": "badge-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1)",
         "toast-in": "toast-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both",
+        "toast-out": "toast-out 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards",
         "check-pop": "check-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1) both",
       },
     },

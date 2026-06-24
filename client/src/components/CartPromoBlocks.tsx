@@ -24,9 +24,9 @@ export function CartPromoBlocks({ pricing }: PromoBlocksProps) {
         </div>
       ) : (
         <div className="rounded-card border border-dashed border-line bg-paper px-4 py-3.5">
-          <p className="text-xs uppercase tracking-wide text-muted">{t.freeDeliveryRemainingLabel}</p>
-          <p className="mt-1 text-lg font-semibold text-ink">
-            {formatPrice(pricing.freeDeliveryRemaining)}
+          <p className="text-sm text-muted">
+            {t.freeDeliveryRemainingLabel}:{" "}
+            <span className="font-semibold text-ink">{formatPrice(pricing.freeDeliveryRemaining)}</span>
           </p>
           <p className="mt-2 text-sm text-muted">
             {t.freeDeliveryUpsell(formatPrice(pricing.freeDeliveryRemaining))}

@@ -11,6 +11,7 @@ interface ToastItem {
   id: number;
   message: string;
   variant: "success" | "info" | "error";
+  exiting: boolean;
 }
 
 interface ToastContextValue {
@@ -19,16 +20,25 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
+const VISIBLE_MS = 1200;
+const FADE_MS = 350;
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const counter = useRef(0);
 
   const show = useCallback<ToastContextValue["show"]>((message, variant = "success") => {
     const id = ++counter.current;
-    setToasts((prev) => [...prev, { id, message, variant }]);
-    const duration = variant === "success" ? 1300 : 2400;
+    setToasts((prev) => [...prev, { id, message, variant, exiting: false }]);
+
+    const duration = variant === "success" ? VISIBLE_MS : 2400;
     window.setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
+      setToasts((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, exiting: true } : t)),
+      );
+      window.setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, FADE_MS);
     }, duration);
   }, []);
 
@@ -39,7 +49,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className="pointer-events-auto flex max-w-sm items-center gap-2 rounded-button bg-ink px-4 py-3 text-sm font-medium text-white shadow-lift animate-toast-in"
+            className={[
+              "pointer-events-auto flex max-w-sm items-center gap-2 rounded-button bg-ink/95 px-4 py-3 text-sm font-medium text-white shadow-lift backdrop-blur-sm",
+              toast.exiting ? "animate-toast-out" : "animate-toast-in",
+            ].join(" ")}
           >
             {toast.variant === "success" && (
               <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/15">

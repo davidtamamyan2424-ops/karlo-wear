@@ -94,11 +94,13 @@ export function useImageCarousel({
 
   const applyTransform = useCallback((dragOffset: number, animate: boolean) => {
     const track = trackRef.current;
-    if (!track) return;
+    const container = containerRef.current;
+    if (!track || !container) return;
+    const slideWidth = container.offsetWidth;
     track.style.transition = animate
       ? "transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)"
       : "none";
-    track.style.transform = `translate3d(calc(${-indexRef.current * 100}% + ${dragOffset}px), 0, 0)`;
+    track.style.transform = `translate3d(${-indexRef.current * slideWidth + dragOffset}px, 0, 0)`;
   }, []);
 
   const resetTo = useCallback(
@@ -122,6 +124,16 @@ export function useImageCarousel({
       applyTransform(0, true);
     }
   }, [index, isDragging, applyTransform]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const ro = new ResizeObserver(() => {
+      applyTransform(dragDxRef.current, false);
+    });
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [applyTransform]);
 
   const scheduleTransform = useCallback(
     (dragOffset: number) => {
