@@ -24,7 +24,7 @@ export const ru = {
         subtitle: "Скидка 10% на каждый второй товар в корзине",
       },
       {
-        title: "Бесплатная доставка от 7 500 ₽",
+        title: "Бесплатная доставка от 12 000 ₽",
         subtitle: "Добавьте ещё товаров и получите доставку бесплатно",
       },
     ],
@@ -64,7 +64,9 @@ export const ru = {
     withoutDiscount: "Без скидки",
     yourSavings: "Ваша выгода",
     products: "Стоимость товаров",
+    withDiscount: "Со скидкой",
     discount: "Скидка",
+    secondItemDiscount: "Скидка на второй товар",
     delivery: "Доставка",
     deliveryCost: "Стоимость доставки",
     deliveryFree: "Бесплатно",
@@ -78,11 +80,8 @@ export const ru = {
     maxStockReached: "Больше нет в наличии",
     discountUpsell: "Добавьте ещё 1 товар и получите скидку 10% на вторую футболку",
     freeDeliveryRemainingLabel: "До бесплатной доставки осталось",
-    freeDeliveryUpsell: (amount: string) =>
-      `Добавьте товаров ещё на ${amount} и получите бесплатную доставку`,
-    freeDeliveryApplied: "Доставка бесплатно",
     freeDeliveryCongratsTitle: "Поздравляем!",
-    freeDeliveryCongratsText: "Курьерская доставка по Москве и области — бесплатно",
+    freeDeliveryCongratsText: "Для вашего заказа действует бесплатная доставка",
   },
   checkout: {
     title: "Оформление заказа",

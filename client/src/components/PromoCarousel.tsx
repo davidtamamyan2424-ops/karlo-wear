@@ -61,7 +61,7 @@ export default function PromoCarousel() {
 
   return (
     <section
-      className="mb-6 overflow-hidden rounded-card border border-[#ebe4da] bg-gradient-to-br from-[#fdfbf7] via-card to-[#f3ede4] shadow-card"
+      className="mb-6 overflow-hidden rounded-card border border-line bg-gradient-to-br from-paper via-card to-[#f5f0e8] shadow-card ring-1 ring-inset ring-white/60"
       aria-label={ru.promo.title}
       onPointerEnter={() => {
         paused.current = true;
@@ -112,7 +112,7 @@ export default function PromoCarousel() {
                 onPointerDown={(e) => e.stopPropagation()}
                 className={[
                   "pointer-events-auto h-1.5 rounded-full transition-all",
-                  i === index ? "w-5 bg-ink/80" : "w-1.5 bg-[#d8d0c6]",
+                  i === index ? "w-5 bg-[#b8a99a]" : "w-1.5 bg-line",
                 ].join(" ")}
               />
             ))}

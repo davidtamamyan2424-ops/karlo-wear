@@ -18,7 +18,7 @@ export function CartPromoBlocks({ pricing }: PromoBlocksProps) {
       )}
 
       {pricing.qualifiesFreeDelivery ? (
-        <div className="rounded-card bg-surface px-4 py-3.5 ring-1 ring-inset ring-line">
+        <div className="rounded-card border border-line bg-paper px-4 py-3.5">
           <p className="text-sm font-semibold text-ink">{t.freeDeliveryCongratsTitle}</p>
           <p className="mt-1 text-sm text-muted">{t.freeDeliveryCongratsText}</p>
         </div>
@@ -27,9 +27,6 @@ export function CartPromoBlocks({ pricing }: PromoBlocksProps) {
           <p className="text-sm text-muted">
             {t.freeDeliveryRemainingLabel}:{" "}
             <span className="font-semibold text-ink">{formatPrice(pricing.freeDeliveryRemaining)}</span>
-          </p>
-          <p className="mt-2 text-sm text-muted">
-            {t.freeDeliveryUpsell(formatPrice(pricing.freeDeliveryRemaining))}
           </p>
         </div>
       )}

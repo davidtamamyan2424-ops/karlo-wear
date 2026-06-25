@@ -16,19 +16,29 @@ function formatDeliveryFee(fee: number | null): string {
 
 export default function CartPriceSummary({ pricing, deliveryFee }: Props) {
   const t = ru.cart;
+  const hasDiscount = pricing.discount > 0;
   const grandTotal = calcGrandTotal(pricing.total, deliveryFee);
 
   return (
     <div className="space-y-2.5 rounded-card bg-surface p-4 text-sm">
       <div className="flex justify-between text-muted">
         <span>{t.products}</span>
-        <span>{formatPrice(pricing.subtotal)}</span>
+        <span className={hasDiscount ? "line-through decoration-muted/60" : ""}>
+          {formatPrice(pricing.subtotal)}
+        </span>
+      </div>
+
+      <div className="flex justify-between">
+        <span className={hasDiscount ? "font-medium text-ink" : "text-muted"}>{t.withDiscount}</span>
+        <span className={hasDiscount ? "font-semibold text-ink" : "text-muted"}>
+          {formatPrice(pricing.total)}
+        </span>
       </div>
 
       <div className="flex justify-between text-muted">
-        <span>{t.discount}</span>
-        <span className={pricing.discount > 0 ? "font-medium text-emerald-700" : ""}>
-          {pricing.discount > 0 ? `−${formatPrice(pricing.discount)}` : formatPrice(0)}
+        <span>{t.secondItemDiscount}</span>
+        <span className={hasDiscount ? "font-medium text-emerald-700" : ""}>
+          {hasDiscount ? `−${formatPrice(pricing.discount)}` : formatPrice(0)}
         </span>
       </div>
 
@@ -39,7 +49,7 @@ export default function CartPriceSummary({ pricing, deliveryFee }: Props) {
 
       <div className="flex justify-between border-t border-line pt-2.5 text-base font-semibold text-ink">
         <span>{t.grandTotal}</span>
-        <span>{formatPrice(grandTotal)}</span>
+        <span className="text-lg">{formatPrice(grandTotal)}</span>
       </div>
     </div>
   );

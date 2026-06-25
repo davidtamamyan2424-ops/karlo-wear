@@ -2,7 +2,7 @@
 export const SECOND_ITEM_DISCOUNT_RATE = 0.1;
 
 /** Порог бесплатной курьерской доставки (копейки). Проверяется после скидки. */
-export const FREE_DELIVERY_THRESHOLD = 750_000;
+export const FREE_DELIVERY_THRESHOLD = 1_200_000;
 
 export interface CartLine {
   unitPrice: number;

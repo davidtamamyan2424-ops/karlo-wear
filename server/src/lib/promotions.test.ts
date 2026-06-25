@@ -26,12 +26,12 @@ describe("calcCartPricing", () => {
     assert.equal(pricing.discount, 38_000);
     assert.equal(pricing.total, 722_000);
     assert.equal(pricing.qualifiesFreeDelivery, false);
-    assert.equal(pricing.freeDeliveryRemaining, 28_000);
+    assert.equal(pricing.freeDeliveryRemaining, 478_000);
   });
 
   it("tracks remaining amount until free delivery", () => {
     const pricing = calcCartPricing([{ unitPrice: 380_000, quantity: 1 }]);
     assert.equal(pricing.qualifiesFreeDelivery, false);
-    assert.equal(pricing.freeDeliveryRemaining, 370_000);
+    assert.equal(pricing.freeDeliveryRemaining, 820_000);
   });
 });
