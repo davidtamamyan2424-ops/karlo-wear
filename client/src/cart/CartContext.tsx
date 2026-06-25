@@ -65,7 +65,8 @@ function loadCart(): CartItem[] {
 function loadDeliveryMethod(): DeliveryMethod {
   try {
     const raw = localStorage.getItem(DELIVERY_STORAGE_KEY);
-    if (raw === "PICKUP" || raw === "MOSCOW" || raw === "MOSCOW_REGION" || raw === "OTHER_REGIONS") {
+    if (raw === "OTHER_REGIONS") return "PICKUP_POINT";
+    if (raw === "PICKUP" || raw === "MOSCOW" || raw === "MOSCOW_REGION" || raw === "PICKUP_POINT") {
       return raw;
     }
   } catch {

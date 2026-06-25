@@ -12,7 +12,7 @@ export function calcDeliveryFee(
   pricing: CartPricing,
 ): number | null {
   if (method === "PICKUP") return 0;
-  if (method === "OTHER_REGIONS") return null;
+  if (method === "PICKUP_POINT") return null;
 
   const base = DELIVERY_BASE_FEES[method] ?? 0;
   if (pricing.qualifiesFreeDelivery) return 0;

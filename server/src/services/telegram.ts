@@ -7,8 +7,10 @@ import {
   DELIVERY_METHOD_LABELS,
   LEGACY_DELIVERY_METHOD_LABELS,
   ORDER_STATUS_LABELS,
+  PICKUP_POINT_TYPE_LABELS,
   type DeliveryMethod,
   type OrderStatus,
+  type PickupPointType,
 } from "../constants.js";
 
 const API_BASE = "https://api.telegram.org";
@@ -150,6 +152,36 @@ export interface OrderNotificationData {
   deliveryComment: string | null;
 }
 
+function formatDeliveryNotification(data: OrderNotificationData): string[] {
+  const method = data.deliveryMethod;
+  const mainLabel = method
+    ? (DELIVERY_METHOD_LABELS[method as DeliveryMethod] ??
+      LEGACY_DELIVERY_METHOD_LABELS[method] ??
+      method)
+    : "—";
+
+  const lines: string[] = [`<b>Способ доставки:</b> ${escapeHtml(mainLabel)}`];
+
+  if (method === "PICKUP_POINT" && data.deliveryComment) {
+    const comment = data.deliveryComment;
+    if (comment === "WILDBERRIES" || comment === "OZON") {
+      const subLabel = PICKUP_POINT_TYPE_LABELS[comment as PickupPointType];
+      lines.push(`<b>Служба доставки:</b> ${escapeHtml(subLabel)}`);
+    } else {
+      lines.push(`<b>Способ доставки (введён клиентом):</b> ${escapeHtml(comment)}`);
+    }
+  }
+
+  if (data.deliveryAddress) {
+    lines.push(
+      "<b>Адрес пункта выдачи / адрес доставки:</b>",
+      escapeHtml(data.deliveryAddress),
+    );
+  }
+
+  return lines;
+}
+
 /** Уведомление администратору о новом заказе. */
 export async function notifyNewOrder(data: OrderNotificationData): Promise<void> {
   const statusLabel =
@@ -164,12 +196,6 @@ export async function notifyNewOrder(data: OrderNotificationData): Promise<void>
     )
     .join("\n");
 
-  const deliveryLabel = data.deliveryMethod
-    ? (DELIVERY_METHOD_LABELS[data.deliveryMethod as DeliveryMethod] ??
-      LEGACY_DELIVERY_METHOD_LABELS[data.deliveryMethod] ??
-      data.deliveryMethod)
-    : "—";
-
   const lines = [
     "<b>🛒 Новый заказ</b>",
     "",
@@ -183,13 +209,13 @@ export async function notifyNewOrder(data: OrderNotificationData): Promise<void>
     "",
     `<b>Сумма заказа:</b> ${formatRub(data.totalAmount)}`,
     "",
-    `<b>Способ доставки:</b> ${escapeHtml(deliveryLabel)}`,
+    ...formatDeliveryNotification(data),
   ];
 
-  if (data.deliveryAddress) {
-    lines.push("<b>Адрес:</b>", escapeHtml(data.deliveryAddress));
-  }
-  if (data.deliveryComment) {
+  if (
+    data.deliveryComment &&
+    data.deliveryMethod !== "PICKUP_POINT"
+  ) {
     lines.push(`<b>Комментарий по доставке:</b> ${escapeHtml(data.deliveryComment)}`);
   }
 

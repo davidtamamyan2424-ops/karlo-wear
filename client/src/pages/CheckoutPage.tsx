@@ -10,8 +10,10 @@ import PhoneInput from "../components/PhoneInput";
 import LegalConsentCheckbox from "../components/LegalConsentCheckbox";
 import CartPriceSummary from "../components/CartPriceSummary";
 import DeliveryMethodPicker from "../components/DeliveryMethodPicker";
+import PickupPointSection from "../components/PickupPointSection";
 import { CartPromoBlocks } from "../components/CartPromoBlocks";
 import { calcDeliveryFee } from "../lib/delivery";
+import type { PickupPointType } from "../constants";
 
 export default function CheckoutPage() {
   const { items, pricing, deliveryMethod, setDeliveryMethod, clear } = useCart();
@@ -25,6 +27,8 @@ export default function CheckoutPage() {
   const [comment, setComment] = useState("");
 
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [pickupPointType, setPickupPointType] = useState<PickupPointType | "">("");
+  const [customDeliveryMethod, setCustomDeliveryMethod] = useState("");
   const [deliveryAck, setDeliveryAck] = useState(false);
   const [legalConsent, setLegalConsent] = useState(false);
 
@@ -49,21 +53,48 @@ export default function CheckoutPage() {
     if (items.length === 0) navigate("/cart", { replace: true });
   }, [items.length, navigate]);
 
-  const needsAddress =
+  const needsCourierAddress =
     deliveryMethod === "MOSCOW" || deliveryMethod === "MOSCOW_REGION";
+
+  const resetPickupFields = () => {
+    setPickupPointType("");
+    setDeliveryAddress("");
+    setCustomDeliveryMethod("");
+  };
 
   const validate = (): boolean => {
     const next: Record<string, string> = {};
-    if (!name.trim()) next.name = ru.validation.nameRequired;
-    if (!isCompleteRuPhone(phone)) next.phone = ru.validation.phoneRequired;
+    const v = ru.validation;
+
+    if (!name.trim()) next.name = v.nameRequired;
+    if (!isCompleteRuPhone(phone)) next.phone = v.phoneRequired;
     const username = telegram.trim().replace(/^@/, "");
-    if (!username) next.telegram = ru.validation.telegramRequired;
-    if (!city.trim()) next.city = ru.validation.cityRequired;
-    if (needsAddress && !deliveryAddress.trim()) {
-      next.deliveryAddress = ru.validation.deliveryAddressRequired;
+    if (!username) next.telegram = v.telegramRequired;
+    if (!city.trim()) next.city = v.cityRequired;
+
+    if (needsCourierAddress && !deliveryAddress.trim()) {
+      next.deliveryAddress = v.deliveryAddressRequired;
     }
-    if (!deliveryAck) next.deliveryAck = ru.validation.deliveryNotConfirmed;
-    if (!legalConsent) next.legal = ru.validation.legalNotConfirmed;
+
+    if (deliveryMethod === "PICKUP_POINT") {
+      if (!pickupPointType) {
+        next.pickupPointType = v.pickupPointTypeRequired;
+      } else if (pickupPointType === "WILDBERRIES" && !deliveryAddress.trim()) {
+        next.deliveryAddress = v.wildberriesAddressRequired;
+      } else if (pickupPointType === "OZON" && !deliveryAddress.trim()) {
+        next.deliveryAddress = v.ozonAddressRequired;
+      } else if (pickupPointType === "CUSTOM") {
+        if (!customDeliveryMethod.trim()) {
+          next.customDeliveryMethod = v.customDeliveryMethodRequired;
+        }
+        if (!deliveryAddress.trim()) {
+          next.deliveryAddress = v.customDeliveryAddressRequired;
+        }
+      }
+    }
+
+    if (!deliveryAck) next.deliveryAck = v.deliveryNotConfirmed;
+    if (!legalConsent) next.legal = v.legalNotConfirmed;
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -89,8 +120,18 @@ export default function CheckoutPage() {
         telegramUser: username,
         telegramId: tgUser?.id ?? null,
         deliveryMethod,
-        deliveryAddress: needsAddress ? deliveryAddress.trim() : null,
-        deliveryComment: null,
+        deliveryAddress:
+          needsCourierAddress || deliveryMethod === "PICKUP_POINT"
+            ? deliveryAddress.trim()
+            : null,
+        pickupPointType:
+          deliveryMethod === "PICKUP_POINT" && pickupPointType
+            ? pickupPointType
+            : undefined,
+        customDeliveryMethod:
+          deliveryMethod === "PICKUP_POINT" && pickupPointType === "CUSTOM"
+            ? customDeliveryMethod.trim()
+            : null,
         deliveryConfirmed: deliveryAck,
         items: items.map((i) => ({
           productId: i.productId,
@@ -179,15 +220,18 @@ export default function CheckoutPage() {
         value={deliveryMethod}
         onChange={(method) => {
           setDeliveryMethod(method);
+          resetPickupFields();
           setErrors((prev) => ({
             ...prev,
             deliveryAddress: "",
+            pickupPointType: "",
+            customDeliveryMethod: "",
           }));
         }}
         pricing={pricing}
       />
 
-      {needsAddress && (
+      {needsCourierAddress && (
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium text-ink">{d.address}</span>
           <input
@@ -201,6 +245,29 @@ export default function CheckoutPage() {
             <span className="mt-1 block text-xs text-red-600">{errors.deliveryAddress}</span>
           )}
         </label>
+      )}
+
+      {deliveryMethod === "PICKUP_POINT" && (
+        <PickupPointSection
+          value={pickupPointType}
+          onChange={(type) => {
+            setPickupPointType(type);
+            setDeliveryAddress("");
+            setCustomDeliveryMethod("");
+            setErrors((prev) => ({
+              ...prev,
+              pickupPointType: "",
+              deliveryAddress: "",
+              customDeliveryMethod: "",
+            }));
+          }}
+          address={deliveryAddress}
+          onAddressChange={setDeliveryAddress}
+          customMethod={customDeliveryMethod}
+          onCustomMethodChange={setCustomDeliveryMethod}
+          errors={errors}
+          inputClass={inputClass}
+        />
       )}
 
       <section className="space-y-3 rounded-card bg-paper p-4 ring-1 ring-inset ring-line">

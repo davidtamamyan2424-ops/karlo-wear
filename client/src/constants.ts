@@ -10,24 +10,35 @@ export const PRODUCT_BADGE_LABELS: Record<ProductBadge, string> = {
   LIMITED: "Ограниченная серия",
 };
 
-export type DeliveryMethod = "PICKUP" | "MOSCOW" | "MOSCOW_REGION" | "OTHER_REGIONS";
+export type DeliveryMethod = "PICKUP" | "MOSCOW" | "MOSCOW_REGION" | "PICKUP_POINT";
 
 export const DELIVERY_METHODS: DeliveryMethod[] = [
   "PICKUP",
   "MOSCOW",
   "MOSCOW_REGION",
-  "OTHER_REGIONS",
+  "PICKUP_POINT",
 ];
 
 export const DELIVERY_METHOD_LABELS: Record<DeliveryMethod, string> = {
   PICKUP: "Самовывоз",
   MOSCOW: "Москва",
   MOSCOW_REGION: "Ближайшее Подмосковье",
-  OTHER_REGIONS: "Другие регионы России",
+  PICKUP_POINT: "Пункт выдачи",
+};
+
+export type PickupPointType = "WILDBERRIES" | "OZON" | "CUSTOM";
+
+export const PICKUP_POINT_TYPES: PickupPointType[] = ["WILDBERRIES", "OZON", "CUSTOM"];
+
+export const PICKUP_POINT_TYPE_LABELS: Record<PickupPointType, string> = {
+  WILDBERRIES: "Wildberries",
+  OZON: "Ozon",
+  CUSTOM: "Другой способ доставки",
 };
 
 /** Подписи для старых заказов. */
 export const LEGACY_DELIVERY_METHOD_LABELS: Record<string, string> = {
+  OTHER_REGIONS: "Другие регионы России",
   WILDBERRIES: "Wildberries",
   OZON: "Ozon",
   OTHER: "Другое",

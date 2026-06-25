@@ -16,10 +16,10 @@ interface Props {
   compact?: boolean;
 }
 
-function deliveryPriceLabel(method: DeliveryMethod, pricing: CartPricing): string {
+function deliveryPriceLabel(method: DeliveryMethod, pricing: CartPricing): string | null {
   const d = ru.checkout.delivery;
+  if (method === "PICKUP_POINT") return null;
   if (method === "PICKUP") return d.optionPrices.PICKUP;
-  if (method === "OTHER_REGIONS") return d.optionPrices.OTHER_REGIONS;
   const fee = calcDeliveryFee(method, pricing);
   if (fee === 0) return ru.cart.deliveryFree;
   return d.optionPrices[method];
@@ -42,6 +42,8 @@ export default function DeliveryMethodPicker({
       <div className="space-y-2">
         {DELIVERY_METHODS.map((method) => {
           const active = value === method;
+          const priceLabel = deliveryPriceLabel(method, pricing);
+          const description = d.optionDescriptions[method];
           return (
             <button
               key={method}
@@ -59,13 +61,17 @@ export default function DeliveryMethodPicker({
             >
               <div className="flex items-start justify-between gap-3">
                 <span className="text-sm font-semibold">{DELIVERY_METHOD_LABELS[method]}</span>
-                <span className={`shrink-0 text-sm font-medium ${active ? "text-white/90" : "text-muted"}`}>
-                  {deliveryPriceLabel(method, pricing)}
-                </span>
+                {priceLabel && (
+                  <span className={`shrink-0 text-sm font-medium ${active ? "text-white/90" : "text-muted"}`}>
+                    {priceLabel}
+                  </span>
+                )}
               </div>
-              <p className={`mt-1 text-sm leading-relaxed ${active ? "text-white/75" : "text-muted"}`}>
-                {d.optionDescriptions[method]}
-              </p>
+              {description && (
+                <p className={`mt-1 text-sm leading-relaxed ${active ? "text-white/75" : "text-muted"}`}>
+                  {description}
+                </p>
+              )}
             </button>
           );
         })}

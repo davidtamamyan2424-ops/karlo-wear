@@ -1,4 +1,4 @@
-import type { DeliveryMethod, OrderStatus, Size } from "./constants";
+import type { DeliveryMethod, OrderStatus, PickupPointType, Size } from "./constants";
 
 export interface ProductSize {
   id: string;
@@ -115,6 +115,8 @@ export interface CreateOrderPayload {
   deliveryMethod: DeliveryMethod;
   deliveryAddress?: string | null;
   deliveryComment?: string | null;
+  pickupPointType?: PickupPointType;
+  customDeliveryMethod?: string | null;
   deliveryConfirmed: boolean;
   items: { productId: string; variantId?: string; sizeLabel: Size; quantity: number }[];
 }

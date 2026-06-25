@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { SIZES, ORDER_STATUSES, PRODUCT_BADGES, DELIVERY_METHODS } from "./constants.js";
+import {
+  SIZES,
+  ORDER_STATUSES,
+  PRODUCT_BADGES,
+  DELIVERY_METHODS,
+  PICKUP_POINT_TYPES,
+} from "./constants.js";
 import {
   EXPENSE_CATEGORIES,
   SALE_CATEGORIES,
@@ -36,10 +42,11 @@ export const createOrderSchema = z
           .max(64),
       ),
     telegramId: z.string().trim().max(64).optional().nullable(),
-    // Доставка
     deliveryMethod: z.enum(DELIVERY_METHODS, {
       errorMap: () => ({ message: "Выберите способ доставки" }),
     }),
+    pickupPointType: z.enum(PICKUP_POINT_TYPES).optional(),
+    customDeliveryMethod: z.string().trim().max(200).optional().nullable(),
     deliveryAddress: z.string().trim().max(500).optional().nullable(),
     deliveryComment: z.string().trim().max(1000).optional().nullable(),
     deliveryConfirmed: z.boolean(),
@@ -62,6 +69,7 @@ export const createOrderSchema = z
         message: "Подтвердите условия доставки",
       });
     }
+
     if (data.deliveryMethod === "MOSCOW" || data.deliveryMethod === "MOSCOW_REGION") {
       if (!data.deliveryAddress || data.deliveryAddress.trim().length === 0) {
         ctx.addIssue({
@@ -71,6 +79,65 @@ export const createOrderSchema = z
         });
       }
     }
+
+    if (data.deliveryMethod === "PICKUP_POINT") {
+      if (!data.pickupPointType) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["pickupPointType"],
+          message: "Выберите способ доставки в пункте выдачи",
+        });
+        return;
+      }
+
+      if (!data.deliveryAddress || data.deliveryAddress.trim().length === 0) {
+        const message =
+          data.pickupPointType === "WILDBERRIES"
+            ? "Укажите адрес пункта выдачи Wildberries"
+            : data.pickupPointType === "OZON"
+              ? "Укажите адрес пункта выдачи Ozon"
+              : "Укажите адрес пункта выдачи или доставки";
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["deliveryAddress"],
+          message,
+        });
+      }
+
+      if (data.pickupPointType === "CUSTOM") {
+        if (!data.customDeliveryMethod || data.customDeliveryMethod.trim().length === 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["customDeliveryMethod"],
+            message: "Укажите способ доставки",
+          });
+        }
+      }
+    }
+  })
+  .transform((data) => {
+    let deliveryComment = data.deliveryComment ?? null;
+
+    if (data.deliveryMethod === "PICKUP_POINT" && data.pickupPointType) {
+      deliveryComment =
+        data.pickupPointType === "CUSTOM"
+          ? (data.customDeliveryMethod?.trim() ?? null)
+          : data.pickupPointType;
+    }
+
+    return {
+      customerName: data.customerName,
+      phone: data.phone,
+      city: data.city,
+      comment: data.comment ?? null,
+      telegramUser: data.telegramUser,
+      telegramId: data.telegramId ?? null,
+      deliveryMethod: data.deliveryMethod,
+      deliveryAddress: data.deliveryAddress ?? null,
+      deliveryComment,
+      deliveryConfirmed: data.deliveryConfirmed,
+      items: data.items,
+    };
   });
 
 export type CreateOrderBody = z.infer<typeof createOrderSchema>;

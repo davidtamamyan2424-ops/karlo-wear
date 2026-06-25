@@ -63,17 +63,27 @@ export const PRODUCT_BADGES = ["NEW", "BESTSELLER", "LIMITED"] as const;
 export type ProductBadge = (typeof PRODUCT_BADGES)[number];
 
 // Способы доставки.
-export const DELIVERY_METHODS = ["PICKUP", "MOSCOW", "MOSCOW_REGION", "OTHER_REGIONS"] as const;
+export const DELIVERY_METHODS = ["PICKUP", "MOSCOW", "MOSCOW_REGION", "PICKUP_POINT"] as const;
 export type DeliveryMethod = (typeof DELIVERY_METHODS)[number];
 
 export const DELIVERY_METHOD_LABELS: Record<DeliveryMethod, string> = {
   PICKUP: "Самовывоз",
   MOSCOW: "Москва",
   MOSCOW_REGION: "Ближайшее Подмосковье",
-  OTHER_REGIONS: "Другие регионы России",
+  PICKUP_POINT: "Пункт выдачи",
+};
+
+export const PICKUP_POINT_TYPES = ["WILDBERRIES", "OZON", "CUSTOM"] as const;
+export type PickupPointType = (typeof PICKUP_POINT_TYPES)[number];
+
+export const PICKUP_POINT_TYPE_LABELS: Record<PickupPointType, string> = {
+  WILDBERRIES: "Wildberries",
+  OZON: "Ozon",
+  CUSTOM: "Другой способ доставки",
 };
 
 export const LEGACY_DELIVERY_METHOD_LABELS: Record<string, string> = {
+  OTHER_REGIONS: "Другие регионы России",
   WILDBERRIES: "Wildberries",
   OZON: "Ozon",
   OTHER: "Другое",
