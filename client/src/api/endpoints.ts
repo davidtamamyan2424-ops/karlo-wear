@@ -305,6 +305,13 @@ export function adminUpdateManualSale(
   });
 }
 
+export function adminDeleteManualSale(token: string, id: string): Promise<void> {
+  return apiRequest<void>(`/admin/manual-sales/${id}`, {
+    method: "DELETE",
+    adminToken: token,
+  });
+}
+
 export function adminFetchExpenses(token: string): Promise<Expense[]> {
   return apiRequest<Expense[]>("/admin/expenses", { adminToken: token });
 }

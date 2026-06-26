@@ -42,7 +42,7 @@ import {
   getFinanceOverview,
 } from "../services/adminFinance.js";
 import { getFinanceSettings, updateFinanceSettings } from "../services/adminFinanceSettings.js";
-import { listManualSales, createManualSale, updateManualSale } from "../services/adminManualSales.js";
+import { listManualSales, createManualSale, updateManualSale, deleteManualSale } from "../services/adminManualSales.js";
 import { listExpenses, createExpense, deleteExpense } from "../services/adminExpenses.js";
 import { uploadProductImages, uploadSizeChart } from "../lib/upload.js";
 import { UPLOADS_URL_PREFIX } from "../lib/uploads.js";
@@ -279,6 +279,14 @@ adminRouter.put(
   asyncHandler(async (req, res) => {
     const body = updateManualSaleSchema.parse(req.body);
     res.json(await updateManualSale(req.params.id, body));
+  }),
+);
+
+adminRouter.delete(
+  "/manual-sales/:id",
+  asyncHandler(async (req, res) => {
+    await deleteManualSale(req.params.id);
+    res.status(204).send();
   }),
 );
 

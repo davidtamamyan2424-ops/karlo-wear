@@ -368,6 +368,8 @@ export const ru = {
       saleDate: "Дата продажи",
       editSale: "Редактировать",
       editSaleTitle: "Редактирование продажи",
+      deleteSale: "Удалить",
+      deleteSaleConfirm: "Удалить эту продажу? Остаток на складе будет восстановлен.",
       comment: "Комментарий",
       noSales: "Ручных продаж пока нет",
       validationError: "Заполните обязательные поля",

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   adminCreateManualSale,
+  adminDeleteManualSale,
   adminFetchManualSales,
   adminFetchProducts,
   adminUpdateManualSale,
@@ -91,6 +92,21 @@ export default function AdminSales({ token }: Props) {
     setSoldAt(toDatetimeLocalValue(sale.soldAt ?? sale.createdAt));
     setShowForm(true);
     setError(null);
+  };
+
+  const handleDelete = async (sale: ManualSale) => {
+    if (!window.confirm(t.deleteSaleConfirm)) return;
+    setError(null);
+    try {
+      await adminDeleteManualSale(token, sale.id);
+      if (editingId === sale.id) {
+        setShowForm(false);
+        resetForm();
+      }
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : ru.common.error);
+    }
   };
 
   const submit = async (e: FormEvent) => {
@@ -333,13 +349,22 @@ export default function AdminSales({ token }: Props) {
               {SALE_SOURCE_LABELS[sale.saleSource] ?? sale.saleSource}
               {sale.comment ? ` · ${sale.comment}` : ""}
             </p>
-            <button
-              type="button"
-              onClick={() => openEdit(sale)}
-              className="mt-2 rounded-lg bg-tg-secondaryBg px-3 py-1.5 text-xs font-medium"
-            >
-              {t.editSale}
-            </button>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => openEdit(sale)}
+                className="rounded-lg bg-tg-secondaryBg px-3 py-1.5 text-xs font-medium"
+              >
+                {t.editSale}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDelete(sale)}
+                className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700"
+              >
+                {t.deleteSale}
+              </button>
+            </div>
           </div>
         ))}
       </div>

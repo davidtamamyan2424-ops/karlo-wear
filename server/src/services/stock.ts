@@ -16,7 +16,7 @@ export async function decrementVariantStock(
 ): Promise<void> {
   const size = await tx.productVariantSize.findUnique({
     where: { id: variantSizeId },
-    include: { variant: true },
+    include: { variant: { include: { product: true } } },
   });
   if (!size) throw conflict("Позиция склада не найдена");
 
@@ -26,7 +26,7 @@ export async function decrementVariantStock(
   });
   if (updated.count !== 1) {
     throw conflict(
-      `Недостаточно товара «${size.variant.name}» размера ${size.label} на складе`,
+      `Недостаточно товара «${size.variant.product.name}» размера ${size.label} на складе`,
     );
   }
 
@@ -66,6 +66,27 @@ export async function incrementVariantStock(
         label: size.label,
       },
       data: { stock: { increment: quantity } },
+    });
+  }
+}
+
+/** Восстанавливает остаток по позиции заказа. */
+export async function restoreOrderItemStock(
+  tx: Tx,
+  item: {
+    productVariantSizeId: string | null;
+    productSizeId: string | null;
+    quantity: number;
+  },
+): Promise<void> {
+  if (item.productVariantSizeId) {
+    await incrementVariantStock(tx, item.productVariantSizeId, item.quantity);
+    return;
+  }
+  if (item.productSizeId) {
+    await tx.productSize.update({
+      where: { id: item.productSizeId },
+      data: { stock: { increment: item.quantity } },
     });
   }
 }

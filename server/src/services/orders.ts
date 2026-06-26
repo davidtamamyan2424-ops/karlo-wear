@@ -15,6 +15,7 @@ import {
 import { calcCartPricing } from "../lib/promotions.js";
 import { calcDeliveryFee } from "../lib/delivery.js";
 import type { DeliveryMethod } from "../constants.js";
+import { decrementVariantStock, restoreOrderItemStock } from "./stock.js";
 
 const ORDER_NUMBER_START = 1000;
 
@@ -90,24 +91,8 @@ export async function createOrder(input: CreateOrderInput) {
         throw notFound("Товар не найден");
       }
 
-      // Условный декремент: уменьшаем остаток только если его достаточно.
-      const updated = await tx.productVariantSize.updateMany({
-        where: { id: size.id, stock: { gte: item.quantity } },
-        data: { stock: { decrement: item.quantity } },
-      });
+      await decrementVariantStock(tx, size.id, item.quantity);
 
-      if (updated.count !== 1) {
-        throw conflict(
-          `Недостаточно товара «${size.variant.product.name}» размера ${size.label} на складе`,
-        );
-      }
-
-      if (size.variant.isDefault) {
-        await tx.productSize.updateMany({
-          where: { productId: size.variant.productId, label: size.label, stock: { gte: item.quantity } },
-          data: { stock: { decrement: item.quantity } },
-        });
-      }
       const baseSize = size.variant.isDefault
         ? await tx.productSize.findFirst({
             where: { productId: size.variant.productId, label: size.label },
@@ -260,18 +245,7 @@ async function restoreStock(
   if (!RESERVED_STATUSES.includes(order.status as OrderStatus)) return;
 
   for (const item of order.items) {
-    if (item.productVariantSizeId) {
-      await tx.productVariantSize.update({
-        where: { id: item.productVariantSizeId },
-        data: { stock: { increment: item.quantity } },
-      });
-    }
-    if (item.productSizeId) {
-      await tx.productSize.updateMany({
-        where: { id: item.productSizeId },
-        data: { stock: { increment: item.quantity } },
-      });
-    }
+    await restoreOrderItemStock(tx, item);
   }
   await tx.order.update({ where: { id: orderId }, data: { stockRestored: true } });
 }

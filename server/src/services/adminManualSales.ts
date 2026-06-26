@@ -101,3 +101,13 @@ export async function updateManualSale(id: string, input: ManualSaleInput) {
     });
   });
 }
+
+export async function deleteManualSale(id: string) {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.manualSale.findUnique({ where: { id } });
+    if (!existing) throw notFound("Продажа не найдена");
+
+    await incrementVariantStock(tx, existing.productVariantSizeId, existing.quantity);
+    await tx.manualSale.delete({ where: { id } });
+  });
+}
