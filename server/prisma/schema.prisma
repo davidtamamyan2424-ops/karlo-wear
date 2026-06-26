@@ -182,6 +182,8 @@ model ManualSale {
   variantName          String
   sizeLabel            String
   unitCostSnapshot     Int                @default(0)
+  soldAt               DateTime           @default(now())
+  saleSource           String             @default("MANUAL") // MANUAL | WEBSITE
   createdAt            DateTime           @default(now())
 }
 

@@ -207,6 +207,7 @@ export async function createOrder(input: CreateOrderInput) {
     deliveryMethod: order.deliveryMethod,
     deliveryAddress: order.deliveryAddress,
     deliveryComment: order.deliveryComment,
+    city: order.city,
   });
 
   return order;

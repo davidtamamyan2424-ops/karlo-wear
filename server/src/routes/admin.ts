@@ -12,6 +12,7 @@ import {
   stockAdjustSchema,
   updateProductSchema,
   manualSaleSchema,
+  updateManualSaleSchema,
   expenseSchema,
   financeSettingsSchema,
 } from "../validation.js";
@@ -41,7 +42,7 @@ import {
   getFinanceOverview,
 } from "../services/adminFinance.js";
 import { getFinanceSettings, updateFinanceSettings } from "../services/adminFinanceSettings.js";
-import { listManualSales, createManualSale } from "../services/adminManualSales.js";
+import { listManualSales, createManualSale, updateManualSale } from "../services/adminManualSales.js";
 import { listExpenses, createExpense, deleteExpense } from "../services/adminExpenses.js";
 import { uploadProductImages, uploadSizeChart } from "../lib/upload.js";
 import { UPLOADS_URL_PREFIX } from "../lib/uploads.js";
@@ -270,6 +271,14 @@ adminRouter.post(
   asyncHandler(async (req, res) => {
     const body = manualSaleSchema.parse(req.body);
     res.status(201).json(await createManualSale(body));
+  }),
+);
+
+adminRouter.put(
+  "/manual-sales/:id",
+  asyncHandler(async (req, res) => {
+    const body = updateManualSaleSchema.parse(req.body);
+    res.json(await updateManualSale(req.params.id, body));
   }),
 );
 

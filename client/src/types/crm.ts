@@ -44,6 +44,8 @@ export interface ManualSale {
   variantName: string;
   sizeLabel: string;
   unitCostSnapshot: number;
+  soldAt: string;
+  saleSource: string;
   createdAt: string;
 }
 

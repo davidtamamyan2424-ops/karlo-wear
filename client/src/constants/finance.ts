@@ -16,4 +16,9 @@ export const SALE_CATEGORY_LABELS: Record<string, string> = {
   DEFECT: "Брак",
 };
 
+export const SALE_SOURCE_LABELS: Record<string, string> = {
+  MANUAL: "Ручная продажа",
+  WEBSITE: "Сайт",
+};
+
 export { MONTH_NAMES_SHORT as MONTH_NAMES } from "../lib/period";

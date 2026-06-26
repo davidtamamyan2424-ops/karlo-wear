@@ -23,7 +23,7 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState("+7");
   const [telegram, setTelegram] = useState("");
   const [telegramReadOnly, setTelegramReadOnly] = useState(false);
-  const [city, setCity] = useState("");
+  const [deliveryCity, setDeliveryCity] = useState("");
   const [comment, setComment] = useState("");
 
   const [deliveryAddress, setDeliveryAddress] = useState("");
@@ -62,6 +62,8 @@ export default function CheckoutPage() {
     setCustomDeliveryMethod("");
   };
 
+  const needsDeliveryCity = deliveryMethod !== "PICKUP";
+
   const validate = (): boolean => {
     const next: Record<string, string> = {};
     const v = ru.validation;
@@ -70,7 +72,9 @@ export default function CheckoutPage() {
     if (!isCompleteRuPhone(phone)) next.phone = v.phoneRequired;
     const username = telegram.trim().replace(/^@/, "");
     if (!username) next.telegram = v.telegramRequired;
-    if (!city.trim()) next.city = v.cityRequired;
+    if (needsDeliveryCity && !deliveryCity.trim()) {
+      next.deliveryCity = v.cityRequired;
+    }
 
     if (needsCourierAddress && !deliveryAddress.trim()) {
       next.deliveryAddress = v.deliveryAddressRequired;
@@ -115,7 +119,7 @@ export default function CheckoutPage() {
       const order = await createOrder({
         customerName: name.trim(),
         phone: normalizedPhone,
-        city: city.trim(),
+        city: needsDeliveryCity ? deliveryCity.trim() : "",
         comment: comment.trim() || null,
         telegramUser: username,
         telegramId: tgUser?.id ?? null,
@@ -203,7 +207,6 @@ export default function CheckoutPage() {
         "text",
         telegramReadOnly,
       )}
-      {field(ru.checkout.city, city, setCity, ru.checkout.cityPlaceholder, "city")}
 
       <label className="block">
         <span className="mb-1.5 block text-sm font-medium text-ink">{ru.checkout.comment}</span>
@@ -226,10 +229,27 @@ export default function CheckoutPage() {
             deliveryAddress: "",
             pickupPointType: "",
             customDeliveryMethod: "",
+            deliveryCity: "",
           }));
         }}
         pricing={pricing}
       />
+
+      {needsDeliveryCity && (
+        <label className="block">
+          <span className="mb-1.5 block text-sm font-medium text-ink">{d.deliveryCity}</span>
+          <input
+            type="text"
+            value={deliveryCity}
+            onChange={(e) => setDeliveryCity(e.target.value)}
+            placeholder={d.deliveryCityPlaceholder}
+            className={inputClass}
+          />
+          {errors.deliveryCity && (
+            <span className="mt-1 block text-xs text-red-600">{errors.deliveryCity}</span>
+          )}
+        </label>
+      )}
 
       {needsCourierAddress && (
         <label className="block">

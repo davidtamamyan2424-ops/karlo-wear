@@ -166,7 +166,7 @@ export async function computePeriodMetrics(filter: PeriodFilter = {}): Promise<P
   }
 
   for (const sale of manualSales) {
-    if (!inPeriod(sale.createdAt, filter)) continue;
+    if (!inPeriod(sale.soldAt, filter)) continue;
     applyManualSaleMetrics(m, sale);
   }
 
@@ -245,7 +245,7 @@ export async function computeMonthlyBreakdown(months = 12, endAt?: Date) {
   }
 
   for (const sale of manualSales) {
-    const key = monthKey(sale.createdAt);
+    const key = monthKey(sale.soldAt);
     applyManualSaleMetrics(touch(key), sale);
   }
 
@@ -299,7 +299,7 @@ export async function computeModelRankings(filter: PeriodFilter = {}) {
   }
 
   for (const sale of manualSales) {
-    if (!inPeriod(sale.createdAt, filter)) continue;
+    if (!inPeriod(sale.soldAt, filter)) continue;
     const s = touch(sale.productId, sale.productName);
     const revenue = sale.amount ?? 0;
     const cost = sale.unitCostSnapshot * sale.quantity;
@@ -333,7 +333,7 @@ export async function computeSizeAndColorRankings(filter: PeriodFilter = {}) {
   }
 
   for (const sale of manualSales) {
-    if (!inPeriod(sale.createdAt, filter)) continue;
+    if (!inPeriod(sale.soldAt, filter)) continue;
     add(sizes, sale.sizeLabel, sale.quantity);
     add(colors, sale.variantName, sale.quantity);
   }

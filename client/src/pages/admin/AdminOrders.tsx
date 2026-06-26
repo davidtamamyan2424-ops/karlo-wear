@@ -133,7 +133,7 @@ export default function AdminOrders({ token }: { token: string }) {
               </p>
               <p>
                 <span className="text-tg-hint">{ru.admin.order.city}: </span>
-                {order.city}
+                {order.city || "—"}
               </p>
               {order.comment && (
                 <p>

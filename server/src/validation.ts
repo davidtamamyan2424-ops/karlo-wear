@@ -9,6 +9,7 @@ import {
 import {
   EXPENSE_CATEGORIES,
   SALE_CATEGORIES,
+  SALE_SOURCES,
 } from "./constants/finance.js";
 import { normalizeRuPhone } from "./lib/phone.js";
 
@@ -29,7 +30,7 @@ export const createOrderSchema = z
         }
         return normalized;
       }),
-    city: z.string().trim().min(1, "Укажите город"),
+    city: z.string().trim().max(120).optional().nullable(),
     comment: z.string().trim().max(1000).optional().nullable(),
     telegramUser: z
       .string()
@@ -68,6 +69,16 @@ export const createOrderSchema = z
         path: ["deliveryConfirmed"],
         message: "Подтвердите условия доставки",
       });
+    }
+
+    if (data.deliveryMethod !== "PICKUP") {
+      if (!data.city || data.city.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["city"],
+          message: "Укажите город доставки",
+        });
+      }
     }
 
     if (data.deliveryMethod === "MOSCOW" || data.deliveryMethod === "MOSCOW_REGION") {
@@ -128,7 +139,7 @@ export const createOrderSchema = z
     return {
       customerName: data.customerName,
       phone: data.phone,
-      city: data.city,
+      city: data.deliveryMethod === "PICKUP" ? "" : (data.city?.trim() ?? ""),
       comment: data.comment ?? null,
       telegramUser: data.telegramUser,
       telegramId: data.telegramId ?? null,
@@ -221,7 +232,11 @@ export const manualSaleSchema = z.object({
   amount: z.number().int().min(0).nullable(),
   comment: z.string().trim().max(500).optional().nullable(),
   saleCategory: z.enum(SALE_CATEGORIES),
+  soldAt: z.coerce.date().optional(),
+  saleSource: z.enum(SALE_SOURCES).optional(),
 });
+
+export const updateManualSaleSchema = manualSaleSchema;
 
 export const expenseSchema = z.object({
   date: z.string().min(1),

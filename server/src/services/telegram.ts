@@ -142,6 +142,7 @@ export interface OrderNotificationData {
   orderNumber: number;
   customerName: string;
   phone: string;
+  city: string;
   telegramUser: string | null;
   items: OrderNotificationItem[];
   totalAmount: number;
@@ -160,7 +161,14 @@ function formatDeliveryNotification(data: OrderNotificationData): string[] {
       method)
     : "—";
 
-  const lines: string[] = [`<b>Способ доставки:</b> ${escapeHtml(mainLabel)}`];
+  const lines: string[] = [];
+
+  if (method === "PICKUP") {
+    lines.push(`<b>🚚 Способ доставки:</b> ${escapeHtml(mainLabel)}`);
+    return lines;
+  }
+
+  lines.push(`<b>🚚 Способ доставки:</b> ${escapeHtml(mainLabel)}`);
 
   if (method === "PICKUP_POINT" && data.deliveryComment) {
     const comment = data.deliveryComment;
@@ -174,7 +182,7 @@ function formatDeliveryNotification(data: OrderNotificationData): string[] {
 
   if (data.deliveryAddress) {
     lines.push(
-      "<b>Адрес пункта выдачи / адрес доставки:</b>",
+      "<b>📍 Адрес пункта выдачи:</b>",
       escapeHtml(data.deliveryAddress),
     );
   }
@@ -209,8 +217,13 @@ export async function notifyNewOrder(data: OrderNotificationData): Promise<void>
     "",
     `<b>Сумма заказа:</b> ${formatRub(data.totalAmount)}`,
     "",
-    ...formatDeliveryNotification(data),
   ];
+
+  if (data.city.trim()) {
+    lines.push(`<b>🏙 Город доставки:</b>`, escapeHtml(data.city.trim()), "");
+  }
+
+  lines.push(...formatDeliveryNotification(data));
 
   if (
     data.deliveryComment &&

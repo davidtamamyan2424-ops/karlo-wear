@@ -26,6 +26,9 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
 export const SALE_CATEGORIES = ["SALE", "GIFT", "SELF", "DEFECT"] as const;
 export type SaleCategory = (typeof SALE_CATEGORIES)[number];
 
+export const SALE_SOURCES = ["MANUAL", "WEBSITE"] as const;
+export type SaleSource = (typeof SALE_SOURCES)[number];
+
 export const SALE_CATEGORY_LABELS: Record<SaleCategory, string> = {
   SALE: "Продажа",
   GIFT: "Подарок",
@@ -42,4 +45,8 @@ export function isExpenseCategory(v: string): v is ExpenseCategory {
 
 export function isSaleCategory(v: string): v is SaleCategory {
   return (SALE_CATEGORIES as readonly string[]).includes(v);
+}
+
+export function isSaleSource(v: string): v is SaleSource {
+  return (SALE_SOURCES as readonly string[]).includes(v);
 }

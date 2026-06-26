@@ -272,10 +272,34 @@ export function adminCreateManualSale(
     amount: number | null;
     comment?: string | null;
     saleCategory: string;
+    soldAt?: string;
+    saleSource?: string;
   },
 ): Promise<ManualSale> {
   return apiRequest<ManualSale>("/admin/manual-sales", {
     method: "POST",
+    body: data,
+    adminToken: token,
+  });
+}
+
+export function adminUpdateManualSale(
+  token: string,
+  id: string,
+  data: {
+    productId: string;
+    variantId: string;
+    sizeLabel: ProductBadgeSize;
+    quantity: number;
+    amount: number | null;
+    comment?: string | null;
+    saleCategory: string;
+    soldAt?: string;
+    saleSource?: string;
+  },
+): Promise<ManualSale> {
+  return apiRequest<ManualSale>(`/admin/manual-sales/${id}`, {
+    method: "PUT",
     body: data,
     adminToken: token,
   });

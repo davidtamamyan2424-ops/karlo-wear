@@ -41,3 +41,31 @@ export async function decrementVariantStock(
     });
   }
 }
+
+/** Возвращает остаток на склад (обратная операция к decrementVariantStock). */
+export async function incrementVariantStock(
+  tx: Tx,
+  variantSizeId: string,
+  quantity: number,
+): Promise<void> {
+  const size = await tx.productVariantSize.findUnique({
+    where: { id: variantSizeId },
+    include: { variant: true },
+  });
+  if (!size) throw conflict("Позиция склада не найдена");
+
+  await tx.productVariantSize.update({
+    where: { id: variantSizeId },
+    data: { stock: { increment: quantity } },
+  });
+
+  if (size.variant.isDefault) {
+    await tx.productSize.updateMany({
+      where: {
+        productId: size.variant.productId,
+        label: size.label,
+      },
+      data: { stock: { increment: quantity } },
+    });
+  }
+}
