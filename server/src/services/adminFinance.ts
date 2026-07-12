@@ -5,7 +5,7 @@ import {
   SALE_STATUSES,
   type SaleCategory,
 } from "../constants/finance.js";
-import { parseMonthQuery } from "../lib/period.js";
+import { parsePeriodQuery, type PeriodQueryInput } from "../lib/period.js";
 import { productUnitCost } from "./stock.js";
 import { getStartingBalance } from "./adminFinanceSettings.js";
 
@@ -224,6 +224,94 @@ export async function computeInventoryValue() {
   };
 }
 
+function dayKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+/** Разбивка метрик по дням или месяцам внутри выбранного периода. */
+export async function computeRangeBreakdown(filter: PeriodFilter) {
+  const { orders, manualSales, expenses } = await loadFinanceData();
+  const from = filter.from ?? new Date(0);
+  const to = filter.to ?? new Date();
+  const daySpan =
+    Math.ceil((to.getTime() - from.getTime()) / 86_400_000) + 1;
+  const useDaily = daySpan <= 35;
+
+  const buckets = new Map<string, PeriodMetrics>();
+  const orderRevenueByKey = new Map<string, number>();
+
+  const touch = (key: string) => {
+    if (!buckets.has(key)) buckets.set(key, emptyMetrics());
+    return buckets.get(key)!;
+  };
+
+  const bucketKey = (date: Date) => (useDaily ? dayKey(date) : monthKey(date));
+
+  for (const order of orders) {
+    if (!inPeriod(order.createdAt, filter)) continue;
+    const key = bucketKey(order.createdAt);
+    const m = touch(key);
+    m.orderCount += 1;
+    orderRevenueByKey.set(key, (orderRevenueByKey.get(key) ?? 0) + order.totalAmount);
+    m.revenue += order.totalAmount;
+    m.cogs += orderCogs(order.items);
+    for (const item of order.items) m.soldUnits += item.quantity;
+  }
+
+  for (const sale of manualSales) {
+    if (!inPeriod(sale.soldAt, filter)) continue;
+    applyManualSaleMetrics(touch(bucketKey(sale.soldAt)), sale);
+  }
+
+  for (const expense of expenses) {
+    if (!inPeriod(expense.date, filter)) continue;
+    touch(bucketKey(expense.date)).otherExpenses += expense.amount;
+  }
+
+  const keys: string[] = [];
+  if (useDaily) {
+    const cur = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+    const end = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+    while (cur <= end) {
+      keys.push(dayKey(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+  } else {
+    const cur = new Date(from.getFullYear(), from.getMonth(), 1);
+    const end = new Date(to.getFullYear(), to.getMonth(), 1);
+    while (cur <= end) {
+      keys.push(monthKey(cur));
+      cur.setMonth(cur.getMonth() + 1);
+    }
+  }
+
+  return keys.map((key) => {
+    const m = finalizeMetrics(
+      { ...(buckets.get(key) ?? emptyMetrics()) },
+      orderRevenueByKey.get(key) ?? 0,
+    );
+    if (useDaily) {
+      const [year, month, day] = key.split("-").map(Number);
+      return {
+        month: key,
+        year,
+        monthNum: month,
+        day,
+        label: `${String(day).padStart(2, "0")}.${String(month).padStart(2, "0")}`,
+        ...m,
+      };
+    }
+    const [year, month] = key.split("-");
+    return {
+      month: key,
+      year: Number(year),
+      monthNum: Number(month),
+      label: `${month}.${year}`,
+      ...m,
+    };
+  });
+}
+
 export async function computeMonthlyBreakdown(months = 12, endAt?: Date) {
   const { orders, manualSales, expenses } = await loadFinanceData();
   const buckets = new Map<string, PeriodMetrics>();
@@ -349,8 +437,12 @@ export async function computeSizeAndColorRankings(filter: PeriodFilter = {}) {
   };
 }
 
-export async function getFinanceOverview(month?: string) {
-  const period = parseMonthQuery(month);
+function resolvePeriod(input: PeriodQueryInput) {
+  return parsePeriodQuery(input);
+}
+
+export async function getFinanceOverview(input: PeriodQueryInput = {}) {
+  const period = resolvePeriod(input);
   const [periodMetrics, businessBalance, startingBalance] = await Promise.all([
     computePeriodMetrics(period),
     computeBusinessBalance(),
@@ -364,16 +456,15 @@ export async function getFinanceOverview(month?: string) {
   };
 }
 
-export async function getDashboard(month?: string) {
-  const period = parseMonthQuery(month);
-  const endAt = period.to ?? new Date();
+export async function getDashboard(input: PeriodQueryInput = {}) {
+  const period = resolvePeriod(input);
 
   const [inventory, periodMetrics, businessBalance, startingBalance, monthly] = await Promise.all([
     computeInventoryValue(),
     computePeriodMetrics(period),
     computeBusinessBalance(),
     getStartingBalance(),
-    computeMonthlyBreakdown(6, endAt),
+    computeRangeBreakdown(period),
   ]);
 
   return {
@@ -384,22 +475,21 @@ export async function getDashboard(month?: string) {
     period: periodMetrics,
     monthly,
     inventoryByProduct: inventory.items,
-    selectedMonth: month ?? undefined,
   };
 }
 
-export async function getAnalytics(month?: string) {
-  const period = parseMonthQuery(month);
-  const endAt = period.to ?? new Date();
+export async function getAnalytics(input: PeriodQueryInput = {}) {
+  const period = resolvePeriod(input);
 
-  const [monthly, rankings, sizeColor, inventory] = await Promise.all([
-    computeMonthlyBreakdown(12, endAt),
+  const [monthly, rankings, sizeColor, inventory, periodMetrics] = await Promise.all([
+    computeRangeBreakdown(period),
     computeModelRankings(period),
     computeSizeAndColorRankings(period),
     computeInventoryValue(),
+    computePeriodMetrics(period),
   ]);
 
-  return { monthly, rankings, sizeColor, inventoryByProduct: inventory.items };
+  return { monthly, rankings, sizeColor, inventoryByProduct: inventory.items, period: periodMetrics };
 }
 
 export function isFreeSale(category: SaleCategory, amount: number | null): boolean {

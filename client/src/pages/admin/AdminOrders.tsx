@@ -10,9 +10,17 @@ import {
   type OrderStatus,
 } from "../../constants";
 import type { Order } from "../../types";
-import { adminFetchOrders, adminSetOrderStatus } from "../../api/endpoints";
+import type { OrderStats } from "../../types/crm";
+import type { PeriodState } from "../../lib/period";
+import {
+  adminFetchOrderStats,
+  adminFetchOrders,
+  adminSetOrderStatus,
+  type OrderListFilter,
+} from "../../api/endpoints";
 import { fileUrl } from "../../api/client";
 import { openLink } from "../../telegram/webapp";
+import DateRangeSelector from "../../components/admin/DateRangeSelector";
 
 const STATUS_FILTERS: OrderStatus[] = [
   "NEW",
@@ -24,6 +32,8 @@ const STATUS_FILTERS: OrderStatus[] = [
   "COMPLETED",
   "CANCELLED",
 ];
+
+type StatCardKey = "total" | "awaiting" | "paid" | "shipped" | "cancelled";
 
 function nextActions(status: OrderStatus): { label: string; target: OrderStatus }[] {
   switch (status) {
@@ -53,28 +63,79 @@ function nextActions(status: OrderStatus): { label: string; target: OrderStatus 
   }
 }
 
-export default function AdminOrders({ token }: { token: string }) {
+function OrderItemLine({ item }: { item: Order["items"][number] }) {
+  const t = ru.admin.order;
+  return (
+    <li className="space-y-0.5">
+      <p className="font-medium">{item.productName}</p>
+      <p>
+        <span className="text-tg-hint">{t.color}: </span>
+        {item.variantName || "—"}
+      </p>
+      <p>
+        <span className="text-tg-hint">{t.size}: </span>
+        {item.sizeLabel ?? "—"}
+      </p>
+      <p>
+        <span className="text-tg-hint">{t.quantity}: </span>
+        {item.quantity} {ru.product.pieces}
+      </p>
+    </li>
+  );
+}
+
+interface Props {
+  token: string;
+  period: PeriodState;
+  onPeriodChange: (period: PeriodState) => void;
+}
+
+export default function AdminOrders({ token, period, onPeriodChange }: Props) {
   const [orders, setOrders] = useState<Order[] | null>(null);
+  const [stats, setStats] = useState<OrderStats | null>(null);
   const [filter, setFilter] = useState<OrderStatus | "">("");
+  const [statusGroup, setStatusGroup] = useState<OrderListFilter["statusGroup"]>();
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  const listFilter: OrderListFilter = {
+    period,
+    ...(statusGroup ? { statusGroup } : filter ? { status: filter } : {}),
+  };
+
   const load = useCallback(() => {
     setError(null);
-    adminFetchOrders(token, filter || undefined)
-      .then(setOrders)
+    Promise.all([
+      adminFetchOrders(token, listFilter),
+      adminFetchOrderStats(token, period),
+    ])
+      .then(([orderList, orderStats]) => {
+        setOrders(orderList);
+        setStats(orderStats);
+      })
       .catch(() => setError(ru.common.error));
-  }, [token, filter]);
+  }, [token, period, statusGroup, filter]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const selectStatCard = (key: StatCardKey) => {
+    setFilter("");
+    if (key === "total") {
+      setStatusGroup(undefined);
+    } else {
+      setStatusGroup(key);
+    }
+  };
 
   const changeStatus = async (orderId: string, status: OrderStatus) => {
     setBusyId(orderId);
     try {
       const updated = await adminSetOrderStatus(token, orderId, status);
       setOrders((prev) => prev?.map((o) => (o.id === orderId ? updated : o)) ?? null);
+      const orderStats = await adminFetchOrderStats(token, period);
+      setStats(orderStats);
     } catch {
       setError(ru.common.error);
     } finally {
@@ -82,13 +143,62 @@ export default function AdminOrders({ token }: { token: string }) {
     }
   };
 
+  const statCards: { key: StatCardKey; emoji: string; label: string; value: number }[] = stats
+    ? [
+        { key: "total", emoji: "🛒", label: ru.admin.orderStats.total, value: stats.total },
+        {
+          key: "awaiting",
+          emoji: "⏳",
+          label: ru.admin.orderStats.awaiting,
+          value: stats.awaitingPayment,
+        },
+        { key: "paid", emoji: "💳", label: ru.admin.orderStats.paid, value: stats.paid },
+        { key: "shipped", emoji: "📦", label: ru.admin.orderStats.shipped, value: stats.shipped },
+        {
+          key: "cancelled",
+          emoji: "❌",
+          label: ru.admin.orderStats.cancelled,
+          value: stats.cancelled,
+        },
+      ]
+    : [];
+
+  const activeCard: StatCardKey | null = statusGroup ?? (filter ? null : "total");
+
   return (
     <div className="space-y-4">
+      <DateRangeSelector value={period} onChange={onPeriodChange} />
+
+      {stats && (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          {statCards.map((card) => (
+            <button
+              key={card.key}
+              type="button"
+              onClick={() => selectStatCard(card.key)}
+              className={[
+                "rounded-xl border p-3 text-left transition",
+                activeCard === card.key
+                  ? "border-tg-button bg-tg-button/10"
+                  : "border-black/10 bg-white hover:border-black/20",
+              ].join(" ")}
+            >
+              <p className="text-lg">{card.emoji}</p>
+              <p className="mt-1 text-xs text-tg-hint">{card.label}</p>
+              <p className="text-lg font-semibold">{card.value}</p>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div>
         <label className="mb-1 block text-sm font-medium">{ru.admin.filterByStatus}</label>
         <select
           value={filter}
-          onChange={(e) => setFilter(e.target.value as OrderStatus | "")}
+          onChange={(e) => {
+            setStatusGroup(undefined);
+            setFilter(e.target.value as OrderStatus | "");
+          }}
           className="w-full rounded-xl border border-black/15 bg-white px-3 py-2 text-sm"
         >
           <option value="">{ru.admin.allStatuses}</option>
@@ -175,13 +285,10 @@ export default function AdminOrders({ token }: { token: string }) {
             </div>
 
             <div className="mt-2 border-t border-black/10 pt-2 text-sm">
-              <p className="mb-1 text-tg-hint">{ru.admin.order.items}:</p>
-              <ul className="space-y-0.5">
+              <p className="mb-2 text-tg-hint">{ru.admin.order.items}:</p>
+              <ul className="space-y-2">
                 {order.items.map((item) => (
-                  <li key={item.id}>
-                    {item.productName} — {ru.product.size}: {item.sizeLabel ?? "—"} —{" "}
-                    {item.quantity} {ru.product.pieces}
-                  </li>
+                  <OrderItemLine key={item.id} item={item} />
                 ))}
               </ul>
             </div>

@@ -124,15 +124,23 @@ async function sendPhoto(imageUrl: string, caption: string): Promise<void> {
 }
 
 function itemCaption(item: OrderNotificationItem): string {
-  return [
+  const lines = [
+    "👕",
     `<b>${escapeHtml(item.productName)}</b>`,
+  ];
+  if (item.variantName) {
+    lines.push(`Цвет: ${escapeHtml(item.variantName)}`);
+  }
+  lines.push(
     `Размер: ${escapeHtml(item.sizeLabel ?? "—")}`,
     `Количество: ${item.quantity} шт.`,
-  ].join("\n");
+  );
+  return lines.join("\n");
 }
 
 export interface OrderNotificationItem {
   productName: string;
+  variantName: string | null;
   sizeLabel: string | null;
   quantity: number;
   imageUrl: string | null;
@@ -196,12 +204,17 @@ export async function notifyNewOrder(data: OrderNotificationData): Promise<void>
     ORDER_STATUS_LABELS[data.status as OrderStatus] ?? data.status;
 
   const itemsText = data.items
-    .map(
-      (item) =>
-        `• ${escapeHtml(item.productName)} — Размер: ${escapeHtml(
-          item.sizeLabel ?? "—",
-        )} — Количество: ${item.quantity} шт.`,
-    )
+    .map((item) => {
+      const parts = [`• ${escapeHtml(item.productName)}`];
+      if (item.variantName) {
+        parts.push(`Цвет: ${escapeHtml(item.variantName)}`);
+      }
+      parts.push(
+        `Размер: ${escapeHtml(item.sizeLabel ?? "—")}`,
+        `Количество: ${item.quantity} шт.`,
+      );
+      return parts.join(" — ");
+    })
     .join("\n");
 
   const lines = [

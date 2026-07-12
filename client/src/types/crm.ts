@@ -18,6 +18,8 @@ export interface MonthlyMetrics extends PeriodMetrics {
   month: string;
   year: number;
   monthNum: number;
+  day?: number;
+  label?: string;
 }
 
 export interface WarehouseRow {
@@ -69,17 +71,6 @@ export interface FinanceSettings {
   updatedAt: string;
 }
 
-export interface DashboardData {
-  businessBalance: number;
-  startingBalance: number;
-  totalStockUnits: number;
-  inventoryValue: number;
-  period: PeriodMetrics;
-  monthly: MonthlyMetrics[];
-  inventoryByProduct: { productId: string; model: string; units: number; value: number }[];
-  selectedMonth?: string;
-}
-
 export interface ModelStats {
   productId: string;
   model: string;
@@ -88,8 +79,61 @@ export interface ModelStats {
   profit: number;
 }
 
+export interface DashboardData {
+  businessBalance: number;
+  startingBalance: number;
+  totalStockUnits: number;
+  inventoryValue: number;
+  period: PeriodMetrics;
+  monthly: MonthlyMetrics[];
+  inventoryByProduct: { productId: string; model: string; units: number; value: number }[];
+}
+
+export type FinanceSource =
+  | "WEBSITE_ORDER"
+  | "MANUAL_SALE"
+  | "REFUND"
+  | "ADJUSTMENT"
+  | "EXPENSE"
+  | "OTHER";
+
+export type FinanceSourceFilter =
+  | "ALL"
+  | "WEBSITE_ORDER"
+  | "MANUAL_SALE"
+  | "REFUND"
+  | "ADJUSTMENT"
+  | "OTHER";
+
+export interface FinanceTransaction {
+  id: string;
+  date: string;
+  source: FinanceSource;
+  sourceLabel: string;
+  description: string;
+  amount: number;
+  operationType: "income" | "expense";
+  orderNumber?: number;
+  customerName?: string;
+  comment?: string | null;
+}
+
+export interface FinanceHistoryResponse {
+  items: FinanceTransaction[];
+  total: number;
+}
+
+export interface OrderStats {
+  total: number;
+  awaitingPayment: number;
+  paid: number;
+  shipped: number;
+  cancelled: number;
+}
+
 export interface AnalyticsData {
   monthly: MonthlyMetrics[];
+  period: PeriodMetrics;
   rankings: {
     byUnits: ModelStats[];
     byProfit: ModelStats[];

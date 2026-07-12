@@ -59,6 +59,7 @@ export interface OrderItem {
   id: string;
   productId: string;
   productName: string;
+  variantName: string | null;
   sizeLabel: string | null;
   unitPrice: number;
   quantity: number;
@@ -118,5 +119,5 @@ export interface CreateOrderPayload {
   pickupPointType?: PickupPointType;
   customDeliveryMethod?: string | null;
   deliveryConfirmed: boolean;
-  items: { productId: string; variantId?: string; sizeLabel: Size; quantity: number }[];
+  items: { productId: string; variantId: string; sizeLabel: Size; quantity: number }[];
 }

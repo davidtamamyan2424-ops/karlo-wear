@@ -17,7 +17,7 @@ import FullscreenImageViewer from "../components/FullscreenImageViewer";
 export default function ProductPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const variantParam = searchParams.get("variant");
   const { addItem } = useCart();
   const { show } = useToast();
@@ -35,27 +35,44 @@ export default function ProductPage() {
   useEffect(() => {
     if (!id) return;
     setProduct(null);
+    setSelectedVariantId(null);
+    setSelectedSize(null);
+    setAddedSize(null);
     fetchProduct(id)
       .then(setProduct)
       .catch(() => setError(ru.common.error));
   }, [id]);
 
+  // Синхронизируем выбранный цвет с ?variant= — иначе после открытия Белого
+  // переключение на Коричневый теряется при любом сбросе состояния со страницы.
   useEffect(() => {
     if (!product) return;
     const fromUrl = variantParam
       ? product.variants.find((variant) => variant.id === variantParam)
       : undefined;
-    setSelectedVariantId(
-      fromUrl?.id ?? product.defaultVariantId ?? product.variants[0]?.id ?? null,
-    );
-    setSelectedSize(null);
-    setAddedSize(null);
-    setViewerOpen(false);
+    const nextId =
+      fromUrl?.id ?? product.defaultVariantId ?? product.variants[0]?.id ?? null;
+    setSelectedVariantId((prev) => (prev === nextId ? prev : nextId));
   }, [product, variantParam]);
 
   useEffect(() => {
+    setSelectedSize(null);
+    setAddedSize(null);
     setViewerOpen(false);
   }, [selectedVariantId]);
+
+  const selectVariant = (variantId: string) => {
+    if (variantId === selectedVariantId) return;
+    hapticSelection();
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("variant", variantId);
+        return next;
+      },
+      { replace: true },
+    );
+  };
 
   if (error) {
     return <p className="py-10 text-center text-sm text-red-600">{error}</p>;
@@ -71,7 +88,14 @@ export default function ProductPage() {
   }
 
   const selectedVariant =
-    product.variants.find((variant) => variant.id === selectedVariantId) ?? product.variants[0];
+    (selectedVariantId
+      ? product.variants.find((variant) => variant.id === selectedVariantId)
+      : undefined) ??
+    (variantParam
+      ? product.variants.find((variant) => variant.id === variantParam)
+      : undefined) ??
+    product.variants.find((variant) => variant.id === product.defaultVariantId) ??
+    product.variants[0];
   const variantSizes = selectedVariant?.sizes ?? [];
   const variantImages = selectedVariant?.images ?? [];
   const hasVariantImages = variantImages.length > 0;
@@ -86,8 +110,10 @@ export default function ProductPage() {
       navigate("/cart");
       return;
     }
-    if (!selectedSize) return;
-    const ok = addItem(product, selectedSize, 1, selectedVariant?.id);
+    // Всегда передаём id выбранного цвета — без fallback на дефолтный вариант.
+    const variantIdToAdd = selectedVariantId ?? selectedVariant?.id;
+    if (!selectedSize || !variantIdToAdd) return;
+    const ok = addItem(product, selectedSize, 1, variantIdToAdd);
     if (ok) {
       hapticImpact("medium");
       show(ru.notifications.addedToCart, "success");
@@ -142,12 +168,7 @@ export default function ProductPage() {
                 <button
                   key={variant.id}
                   type="button"
-                  onClick={() => {
-                    hapticSelection();
-                    setSelectedVariantId(variant.id);
-                    setSelectedSize(null);
-                    setAddedSize(null);
-                  }}
+                  onClick={() => selectVariant(variant.id)}
                   className={[
                     "press flex items-center gap-2 rounded-button px-3 py-2 text-sm font-medium",
                     active ? "bg-ink text-white" : "bg-surface text-ink hover:bg-line",

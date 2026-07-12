@@ -55,7 +55,7 @@ export const createOrderSchema = z
       .array(
         z.object({
           productId: z.string().min(1),
-          variantId: z.string().min(1).optional(),
+          variantId: z.string().min(1, "Укажите цвет товара"),
           sizeLabel: z.enum(SIZES),
           quantity: z.number().int().min(1).max(99),
         }),

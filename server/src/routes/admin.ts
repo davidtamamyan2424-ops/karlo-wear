@@ -16,7 +16,7 @@ import {
   expenseSchema,
   financeSettingsSchema,
 } from "../validation.js";
-import { listOrders, setOrderStatus } from "../services/orders.js";
+import { listOrders, setOrderStatus, getOrderStats } from "../services/orders.js";
 import {
   createPaymentAccount,
   listPaymentAccounts,
@@ -41,6 +41,8 @@ import {
   getAnalytics,
   getFinanceOverview,
 } from "../services/adminFinance.js";
+import { getFinanceHistory, type FinanceSourceFilter } from "../services/adminFinanceHistory.js";
+import { periodQueryFromRequest } from "../lib/period.js";
 import { getFinanceSettings, updateFinanceSettings } from "../services/adminFinanceSettings.js";
 import { listManualSales, createManualSale, updateManualSale, deleteManualSale } from "../services/adminManualSales.js";
 import { listExpenses, createExpense, deleteExpense } from "../services/adminExpenses.js";
@@ -57,16 +59,46 @@ adminRouter.get("/session", (_req, res) => {
 });
 
 // --- Заказы ---
+const ORDER_STATUS_GROUPS: Record<string, OrderStatus[]> = {
+  awaiting: ["NEW", "AWAITING_PAYMENT", "PAYMENT_REVIEW"],
+  paid: ["PAID", "IN_PRODUCTION"],
+  shipped: ["SHIPPED", "COMPLETED"],
+  cancelled: ["CANCELLED"],
+};
+
+adminRouter.get(
+  "/orders/stats",
+  asyncHandler(async (req, res) => {
+    const period = periodQueryFromRequest(req.query as Record<string, unknown>);
+    res.json(await getOrderStats({ from: period.from, to: period.to }));
+  }),
+);
+
 adminRouter.get(
   "/orders",
   asyncHandler(async (req, res) => {
+    const period = periodQueryFromRequest(req.query as Record<string, unknown>);
     const statusParam = req.query.status;
+    const groupParam = req.query.statusGroup;
+
     let status: OrderStatus | undefined;
-    if (typeof statusParam === "string" && statusParam.length > 0) {
+    let statuses: OrderStatus[] | undefined;
+
+    if (typeof groupParam === "string" && groupParam in ORDER_STATUS_GROUPS) {
+      statuses = ORDER_STATUS_GROUPS[groupParam];
+    } else if (typeof statusParam === "string" && statusParam.length > 0) {
       if (!isOrderStatus(statusParam)) throw badRequest("Недопустимый статус для фильтра");
       status = statusParam;
     }
-    res.json(await listOrders({ status }));
+
+    res.json(
+      await listOrders({
+        status,
+        statuses,
+        from: period.from,
+        to: period.to,
+      }),
+    );
   }),
 );
 
@@ -223,24 +255,68 @@ adminRouter.get(
 adminRouter.get(
   "/dashboard",
   asyncHandler(async (req, res) => {
-    const month = typeof req.query.month === "string" ? req.query.month : undefined;
-    res.json(await getDashboard(month));
+    const q = req.query;
+    res.json(
+      await getDashboard({
+        preset: typeof q.preset === "string" ? q.preset : undefined,
+        from: typeof q.from === "string" ? q.from : undefined,
+        to: typeof q.to === "string" ? q.to : undefined,
+        month: typeof q.month === "string" ? q.month : undefined,
+      }),
+    );
   }),
 );
 
 adminRouter.get(
   "/analytics",
   asyncHandler(async (req, res) => {
-    const month = typeof req.query.month === "string" ? req.query.month : undefined;
-    res.json(await getAnalytics(month));
+    const q = req.query;
+    res.json(
+      await getAnalytics({
+        preset: typeof q.preset === "string" ? q.preset : undefined,
+        from: typeof q.from === "string" ? q.from : undefined,
+        to: typeof q.to === "string" ? q.to : undefined,
+        month: typeof q.month === "string" ? q.month : undefined,
+      }),
+    );
   }),
 );
 
 adminRouter.get(
   "/finance/summary",
   asyncHandler(async (req, res) => {
-    const month = typeof req.query.month === "string" ? req.query.month : undefined;
-    res.json(await getFinanceOverview(month));
+    const q = req.query;
+    res.json(
+      await getFinanceOverview({
+        preset: typeof q.preset === "string" ? q.preset : undefined,
+        from: typeof q.from === "string" ? q.from : undefined,
+        to: typeof q.to === "string" ? q.to : undefined,
+        month: typeof q.month === "string" ? q.month : undefined,
+      }),
+    );
+  }),
+);
+
+adminRouter.get(
+  "/finance/history",
+  asyncHandler(async (req, res) => {
+    const q = req.query;
+    const period = periodQueryFromRequest(q as Record<string, unknown>);
+    const sourceRaw = typeof q.source === "string" ? q.source : "ALL";
+    const validSources = new Set([
+      "ALL",
+      "WEBSITE_ORDER",
+      "MANUAL_SALE",
+      "REFUND",
+      "ADJUSTMENT",
+      "OTHER",
+    ]);
+    const source = validSources.has(sourceRaw) ? (sourceRaw as FinanceSourceFilter) : "ALL";
+    const sort = q.sort === "asc" ? "asc" : "desc";
+    const limit = Math.min(500, Math.max(1, Number(q.limit) || 100));
+    const offset = Math.max(0, Number(q.offset) || 0);
+
+    res.json(await getFinanceHistory({ period, source, sort, limit, offset }));
   }),
 );
 

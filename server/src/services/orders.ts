@@ -21,7 +21,7 @@ const ORDER_NUMBER_START = 1000;
 
 export interface CreateOrderItemInput {
   productId: string;
-  variantId?: string;
+  variantId: string;
   sizeLabel: string;
   quantity: number;
 }
@@ -76,19 +76,23 @@ export async function createOrder(input: CreateOrderInput) {
         throw badRequest("Неверное количество товара");
       }
 
+      if (!item.variantId) {
+        throw badRequest("Не указан цвет товара");
+      }
+
       const size = await tx.productVariantSize.findFirst({
         where: {
           label: item.sizeLabel,
           variant: {
+            id: item.variantId,
             productId: item.productId,
-            ...(item.variantId ? { id: item.variantId } : { isDefault: true }),
           },
         },
         include: { variant: { include: { product: true } } },
       });
 
       if (!size || !size.variant.product.isActive) {
-        throw notFound("Товар не найден");
+        throw notFound("Товар или выбранный цвет не найден");
       }
 
       await decrementVariantStock(tx, size.id, item.quantity);
@@ -167,11 +171,32 @@ export async function createOrder(input: CreateOrderInput) {
   });
 
   // Уведомление администратору (вне транзакции — сбой не должен ломать заказ).
-  const productImages = await prisma.product.findMany({
-    where: { id: { in: order.items.map((i) => i.productId) } },
-    select: { id: true, imageUrl: true },
-  });
-  const imageByProductId = new Map(productImages.map((p) => [p.id, p.imageUrl]));
+  const variantIds = order.items
+    .map((i) => i.productVariantId)
+    .filter((id): id is string => Boolean(id));
+  const variants = variantIds.length
+    ? await prisma.productVariant.findMany({
+        where: { id: { in: variantIds } },
+        select: { id: true, imageUrl: true, imagesJson: true },
+      })
+    : [];
+
+  const imageByVariantId = new Map(
+    variants.map((v) => {
+      let imageUrl = v.imageUrl;
+      if (v.imagesJson) {
+        try {
+          const parsed = JSON.parse(v.imagesJson);
+          if (Array.isArray(parsed) && typeof parsed[0] === "string") {
+            imageUrl = parsed[0];
+          }
+        } catch {
+          /* keep cover */
+        }
+      }
+      return [v.id, imageUrl] as const;
+    }),
+  );
 
   void notifyNewOrder({
     orderNumber: order.orderNumber,
@@ -181,9 +206,10 @@ export async function createOrder(input: CreateOrderInput) {
     items: order.items.map(
       (i): OrderNotificationItem => ({
         productName: i.productName,
+        variantName: i.variantName,
         sizeLabel: i.sizeLabel,
         quantity: i.quantity,
-        imageUrl: imageByProductId.get(i.productId) ?? null,
+        imageUrl: (i.productVariantId && imageByVariantId.get(i.productVariantId)) || null,
       }),
     ),
     totalAmount: order.totalAmount,
@@ -272,14 +298,73 @@ export async function setOrderStatus(orderId: string, status: OrderStatus) {
 
 export interface ListOrdersFilter {
   status?: OrderStatus;
+  statuses?: OrderStatus[];
+  from?: Date;
+  to?: Date;
+}
+
+function orderWhere(filter: ListOrdersFilter) {
+  const where: {
+    status?: OrderStatus | { in: OrderStatus[] };
+    createdAt?: { gte?: Date; lte?: Date };
+  } = {};
+
+  if (filter.statuses?.length) {
+    where.status = { in: filter.statuses };
+  } else if (filter.status) {
+    where.status = filter.status;
+  }
+
+  if (filter.from || filter.to) {
+    where.createdAt = {};
+    if (filter.from) where.createdAt.gte = filter.from;
+    if (filter.to) where.createdAt.lte = filter.to;
+  }
+
+  return Object.keys(where).length > 0 ? where : undefined;
 }
 
 export async function listOrders(filter: ListOrdersFilter = {}) {
   return prisma.order.findMany({
-    where: filter.status ? { status: filter.status } : undefined,
+    where: orderWhere(filter),
     include: orderInclude,
     orderBy: { createdAt: "desc" },
   });
+}
+
+export interface OrderStats {
+  total: number;
+  awaitingPayment: number;
+  paid: number;
+  shipped: number;
+  cancelled: number;
+}
+
+const AWAITING_STATUSES: OrderStatus[] = ["NEW", "AWAITING_PAYMENT", "PAYMENT_REVIEW"];
+const PAID_STATUSES: OrderStatus[] = ["PAID", "IN_PRODUCTION"];
+
+export async function getOrderStats(filter: Pick<ListOrdersFilter, "from" | "to"> = {}): Promise<OrderStats> {
+  const where = orderWhere(filter);
+  const rows = await prisma.order.groupBy({
+    by: ["status"],
+    where,
+    _count: { _all: true },
+  });
+
+  const count = (statuses: OrderStatus[]) =>
+    rows
+      .filter((r) => (statuses as readonly string[]).includes(r.status))
+      .reduce((s, r) => s + r._count._all, 0);
+
+  const total = rows.reduce((s, r) => s + r._count._all, 0);
+
+  return {
+    total,
+    awaitingPayment: count(AWAITING_STATUSES),
+    paid: count(PAID_STATUSES),
+    shipped: count(["SHIPPED", "COMPLETED"]),
+    cancelled: count(["CANCELLED"]),
+  };
 }
 
 /**

@@ -1,16 +1,23 @@
 import { useEffect, useState } from "react";
 import { adminFetchAnalytics } from "../../api/endpoints";
 import type { AnalyticsData } from "../../types/crm";
+import type { PeriodState } from "../../lib/period";
 import { ru } from "../../i18n/ru";
 import { formatPrice } from "../../lib/format";
 import BarChart from "../../components/admin/BarChart";
-import PeriodSelector from "../../components/admin/PeriodSelector";
+import DateRangeSelector from "../../components/admin/DateRangeSelector";
+import MetricCard from "../../components/admin/MetricCard";
 import { MONTH_NAMES } from "../../constants/finance";
 
 interface Props {
   token: string;
-  period: string;
-  onPeriodChange: (month: string) => void;
+  period: PeriodState;
+  onPeriodChange: (period: PeriodState) => void;
+}
+
+function bucketLabel(m: AnalyticsData["monthly"][number]): string {
+  if (m.label) return m.label;
+  return `${MONTH_NAMES[m.monthNum - 1]} ${m.year}`;
 }
 
 export default function AdminAnalytics({ token, period, onPeriodChange }: Props) {
@@ -23,23 +30,20 @@ export default function AdminAnalytics({ token, period, onPeriodChange }: Props)
 
   if (!data) return <p className="text-sm text-tg-hint">{ru.admin.loading}</p>;
 
-  const monthLabel = (m: { monthNum: number; year: number }) =>
-    `${MONTH_NAMES[m.monthNum - 1]} ${m.year}`;
-
   const aovChart = data.monthly.map((m) => ({
-    label: monthLabel(m),
+    label: bucketLabel(m),
     value: m.averageOrderValue,
   }));
   const revenueChart = data.monthly.map((m) => ({
-    label: monthLabel(m),
+    label: bucketLabel(m),
     value: m.revenue,
   }));
   const profitChart = data.monthly.map((m) => ({
-    label: monthLabel(m),
+    label: bucketLabel(m),
     value: m.netProfit,
   }));
   const ordersChart = data.monthly.map((m) => ({
-    label: monthLabel(m),
+    label: bucketLabel(m),
     value: m.orderCount,
   }));
 
@@ -51,7 +55,14 @@ export default function AdminAnalytics({ token, period, onPeriodChange }: Props)
 
   return (
     <div className="space-y-5">
-      <PeriodSelector value={period} onChange={onPeriodChange} />
+      <DateRangeSelector value={period} onChange={onPeriodChange} />
+
+      <div className="grid grid-cols-2 gap-3">
+        <MetricCard label={t.orderCount} value={String(data.period.orderCount)} />
+        <MetricCard label={t.averageOrderValue} value={formatPrice(data.period.averageOrderValue)} />
+        <MetricCard label={t.soldUnits} value={String(data.period.soldUnits)} />
+        <MetricCard label={t.revenue} value={formatPrice(data.period.revenue)} />
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <ChartBlock title={t.aovChart} items={aovChart} formatValue={formatPrice} />

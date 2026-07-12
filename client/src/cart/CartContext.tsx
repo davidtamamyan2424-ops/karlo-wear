@@ -35,8 +35,8 @@ interface CartContextValue {
   pricing: CartPricing;
   deliveryMethod: DeliveryMethod;
   setDeliveryMethod: (method: DeliveryMethod) => void;
-  /** Добавляет товар. Возвращает false, если достигнут лимит склада. */
-  addItem: (product: Product, size: Size, quantity?: number, variantId?: string) => boolean;
+  /** Добавляет товар. Возвращает false, если достигнут лимит склада или вариант не найден. */
+  addItem: (product: Product, size: Size, quantity: number | undefined, variantId: string) => boolean;
   setQuantity: (key: string, quantity: number) => void;
   removeItem: (key: string) => void;
   clear: () => void;
@@ -56,7 +56,16 @@ function loadCart(): CartItem[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as CartItem[]) : [];
+    if (!Array.isArray(parsed)) return [];
+    // Отбрасываем старые позиции без variantId — иначе заказ уйдёт на дефолтный цвет.
+    return (parsed as CartItem[]).filter(
+      (i) =>
+        typeof i.productId === "string" &&
+        typeof i.variantId === "string" &&
+        i.variantId.length > 0 &&
+        typeof i.size === "string" &&
+        typeof i.quantity === "number",
+    );
   } catch {
     return [];
   }
@@ -92,10 +101,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addItem = useCallback<CartContextValue["addItem"]>((product, size, quantity = 1, variantId) => {
-    const variant =
-      product.variants.find((v) => v.id === variantId) ??
-      product.variants.find((v) => v.id === product.defaultVariantId) ??
-      product.variants[0];
+    // Никогда не подставляем дефолтный цвет — только явно выбранный вариант.
+    const variant = product.variants.find((v) => v.id === variantId);
     if (!variant) return false;
     const sizeInfo = variant.sizes.find((s) => s.label === size);
     const maxStock = sizeInfo?.stock ?? 0;

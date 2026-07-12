@@ -1,17 +1,23 @@
 import { useEffect, useState } from "react";
 import { adminFetchDashboard } from "../../api/endpoints";
 import type { DashboardData } from "../../types/crm";
+import type { PeriodState } from "../../lib/period";
 import { ru } from "../../i18n/ru";
 import { formatPrice } from "../../lib/format";
 import MetricCard from "../../components/admin/MetricCard";
+import DateRangeSelector from "../../components/admin/DateRangeSelector";
 import BarChart from "../../components/admin/BarChart";
-import PeriodSelector from "../../components/admin/PeriodSelector";
 import { MONTH_NAMES } from "../../constants/finance";
 
 interface Props {
   token: string;
-  period: string;
-  onPeriodChange: (month: string) => void;
+  period: PeriodState;
+  onPeriodChange: (period: PeriodState) => void;
+}
+
+function bucketLabel(m: DashboardData["monthly"][number]): string {
+  if (m.label) return m.label;
+  return `${MONTH_NAMES[m.monthNum - 1]} ${m.year}`;
 }
 
 export default function AdminDashboard({ token, period, onPeriodChange }: Props) {
@@ -28,29 +34,26 @@ export default function AdminDashboard({ token, period, onPeriodChange }: Props)
   if (error) return <p className="text-sm text-red-600">{error}</p>;
   if (!data) return <p className="text-sm text-tg-hint">{ru.admin.loading}</p>;
 
-  const monthLabel = (m: { monthNum: number; year: number }) =>
-    `${MONTH_NAMES[m.monthNum - 1]} ${m.year}`;
-
   const revenueChart = data.monthly.map((m) => ({
-    label: monthLabel(m),
+    label: bucketLabel(m),
     value: m.revenue,
   }));
   const profitChart = data.monthly.map((m) => ({
-    label: monthLabel(m),
+    label: bucketLabel(m),
     value: m.netProfit,
   }));
   const ordersChart = data.monthly.map((m) => ({
-    label: monthLabel(m),
+    label: bucketLabel(m),
     value: m.orderCount,
   }));
   const aovChart = data.monthly.map((m) => ({
-    label: monthLabel(m),
+    label: bucketLabel(m),
     value: m.averageOrderValue,
   }));
 
   return (
     <div className="space-y-5">
-      <PeriodSelector value={period} onChange={onPeriodChange} />
+      <DateRangeSelector value={period} onChange={onPeriodChange} />
 
       <div className="grid grid-cols-2 gap-3">
         <MetricCard label={t.businessBalance} value={formatPrice(data.businessBalance)} large />
@@ -62,6 +65,7 @@ export default function AdminDashboard({ token, period, onPeriodChange }: Props)
         <MetricCard label={t.developmentFunds} value={formatPrice(data.period.developmentFunds)} />
         <MetricCard label={t.averageOrderValue} value={formatPrice(data.period.averageOrderValue)} />
         <MetricCard label={t.orderCount} value={String(data.period.orderCount)} />
+        <MetricCard label={t.soldUnits} value={String(data.period.soldUnits)} />
         <MetricCard label={t.totalStock} value={`${data.totalStockUnits} шт.`} />
       </div>
 

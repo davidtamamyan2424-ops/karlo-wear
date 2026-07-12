@@ -10,12 +10,23 @@ import type {
   AnalyticsData,
   DashboardData,
   Expense,
+  FinanceHistoryResponse,
   FinanceOverview,
   FinanceSettings,
+  FinanceSourceFilter,
   ManualSale,
+  OrderStats,
   WarehouseRow,
 } from "../types/crm";
+import type { PeriodState } from "../lib/period";
+import { periodQueryString } from "../lib/period";
 import type { OrderStatus } from "../constants";
+
+export type OrderListFilter = {
+  status?: OrderStatus;
+  statusGroup?: "awaiting" | "paid" | "shipped" | "cancelled";
+  period?: PeriodState;
+};
 
 // --- Публичные эндпоинты ---
 export function fetchProducts(): Promise<Product[]> {
@@ -45,9 +56,29 @@ export function adminCheckSession(token: string): Promise<{ ok: boolean }> {
   return apiRequest<{ ok: boolean }>("/admin/session", { adminToken: token });
 }
 
-export function adminFetchOrders(token: string, status?: OrderStatus): Promise<Order[]> {
-  const query = status ? `?status=${encodeURIComponent(status)}` : "";
-  return apiRequest<Order[]>(`/admin/orders${query}`, { adminToken: token });
+function appendQuery(base: string, params: URLSearchParams): string {
+  const qs = params.toString();
+  return qs ? `${base}?${qs}` : base;
+}
+
+export function adminFetchOrders(token: string, filter: OrderListFilter = {}): Promise<Order[]> {
+  const params = new URLSearchParams();
+  if (filter.period) {
+    const periodQs = new URLSearchParams(periodQueryString(filter.period).replace(/^\?/, ""));
+    periodQs.forEach((v, k) => params.set(k, v));
+  }
+  if (filter.statusGroup) {
+    params.set("statusGroup", filter.statusGroup);
+  } else if (filter.status) {
+    params.set("status", filter.status);
+  }
+  return apiRequest<Order[]>(appendQuery("/admin/orders", params), { adminToken: token });
+}
+
+export function adminFetchOrderStats(token: string, period: PeriodState): Promise<OrderStats> {
+  return apiRequest<OrderStats>(`/admin/orders/stats${periodQueryString(period)}`, {
+    adminToken: token,
+  });
 }
 
 export function adminSetOrderStatus(
@@ -224,19 +255,44 @@ export function adminUploadSizeChart(
 }
 
 // --- CRM ---
-export function adminFetchDashboard(token: string, month?: string): Promise<DashboardData> {
-  const query = month ? `?month=${encodeURIComponent(month)}` : "";
-  return apiRequest<DashboardData>(`/admin/dashboard${query}`, { adminToken: token });
+export function adminFetchDashboard(token: string, period: PeriodState): Promise<DashboardData> {
+  return apiRequest<DashboardData>(`/admin/dashboard${periodQueryString(period)}`, {
+    adminToken: token,
+  });
 }
 
-export function adminFetchAnalytics(token: string, month?: string): Promise<AnalyticsData> {
-  const query = month ? `?month=${encodeURIComponent(month)}` : "";
-  return apiRequest<AnalyticsData>(`/admin/analytics${query}`, { adminToken: token });
+export function adminFetchAnalytics(token: string, period: PeriodState): Promise<AnalyticsData> {
+  return apiRequest<AnalyticsData>(`/admin/analytics${periodQueryString(period)}`, {
+    adminToken: token,
+  });
 }
 
-export function adminFetchFinanceSummary(token: string, month?: string): Promise<FinanceOverview> {
-  const query = month ? `?month=${encodeURIComponent(month)}` : "";
-  return apiRequest<FinanceOverview>(`/admin/finance/summary${query}`, { adminToken: token });
+export function adminFetchFinanceSummary(token: string, period: PeriodState): Promise<FinanceOverview> {
+  return apiRequest<FinanceOverview>(`/admin/finance/summary${periodQueryString(period)}`, {
+    adminToken: token,
+  });
+}
+
+export interface FinanceHistoryParams {
+  period: PeriodState;
+  source?: FinanceSourceFilter;
+  sort?: "asc" | "desc";
+  limit?: number;
+  offset?: number;
+}
+
+export function adminFetchFinanceHistory(
+  token: string,
+  params: FinanceHistoryParams,
+): Promise<FinanceHistoryResponse> {
+  const qs = new URLSearchParams(periodQueryString(params.period).replace(/^\?/, ""));
+  if (params.source) qs.set("source", params.source);
+  if (params.sort) qs.set("sort", params.sort);
+  if (params.limit != null) qs.set("limit", String(params.limit));
+  if (params.offset != null) qs.set("offset", String(params.offset));
+  return apiRequest<FinanceHistoryResponse>(appendQuery("/admin/finance/history", qs), {
+    adminToken: token,
+  });
 }
 
 export function adminFetchFinanceSettings(token: string): Promise<FinanceSettings> {
