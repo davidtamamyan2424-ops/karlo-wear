@@ -1,8 +1,50 @@
 import type { TelegramWebApp } from "./types";
 
+const TELEGRAM_SCRIPT_URL = "https://telegram.org/js/telegram-web-app.js";
+const SCRIPT_LOAD_TIMEOUT_MS = 8_000;
+
+type TelegramWindow = Window & {
+  TelegramWebviewProxy?: unknown;
+  TelegramWebviewProxyProto?: unknown;
+};
+
+let sdkLoadPromise: Promise<void> | null = null;
+
 /** Returns the Telegram WebApp instance if running inside Telegram, otherwise null. */
 export function getWebApp(): TelegramWebApp | null {
   return window.Telegram?.WebApp ?? null;
+}
+
+/**
+ * Detects Telegram Mini App without loading telegram.org.
+ * Regular browsers must never match — otherwise the public site would hang on telegram.org.
+ */
+export function shouldLoadTelegramSdk(): boolean {
+  if (typeof window === "undefined") return false;
+  if (window.Telegram?.WebApp) return true;
+
+  const w = window as TelegramWindow;
+  // Android / desktop Telegram WebView bridge (injected before page JS runs).
+  if (w.TelegramWebviewProxy || w.TelegramWebviewProxyProto) return true;
+
+  // Mini App launch params Telegram puts into the URL hash (and sometimes query).
+  if (hasTgWebAppLaunchParam(window.location.hash.slice(1))) return true;
+  if (hasTgWebAppLaunchParam(window.location.search.slice(1))) return true;
+
+  return false;
+}
+
+function hasTgWebAppLaunchParam(raw: string): boolean {
+  if (!raw) return false;
+  // Fast path without full parse (hash can be large).
+  if (
+    raw.includes("tgWebAppData") ||
+    raw.includes("tgWebAppVersion") ||
+    raw.includes("tgWebAppPlatform")
+  ) {
+    return true;
+  }
+  return false;
 }
 
 /** Whether the app is currently running inside the Telegram client. */
@@ -71,8 +113,68 @@ function applyThemeParams(webApp: TelegramWebApp): void {
   }
 }
 
-/** Initializes the Telegram WebApp: marks ready, expands, and syncs theme. Safe to call outside Telegram. */
-export function initTelegram(): TelegramWebApp | null {
+function loadTelegramSdk(): Promise<void> {
+  if (window.Telegram?.WebApp) return Promise.resolve();
+  if (!shouldLoadTelegramSdk()) return Promise.resolve();
+
+  if (sdkLoadPromise) return sdkLoadPromise;
+
+  sdkLoadPromise = new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(
+      `script[src="${TELEGRAM_SCRIPT_URL}"]`,
+    );
+    if (existing) {
+      if (window.Telegram?.WebApp) {
+        resolve();
+        return;
+      }
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Telegram SDK load failed")), {
+        once: true,
+      });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = TELEGRAM_SCRIPT_URL;
+    script.async = true;
+
+    const timer = window.setTimeout(() => {
+      script.remove();
+      reject(new Error("Telegram SDK load timeout"));
+    }, SCRIPT_LOAD_TIMEOUT_MS);
+
+    script.onload = () => {
+      window.clearTimeout(timer);
+      resolve();
+    };
+    script.onerror = () => {
+      window.clearTimeout(timer);
+      script.remove();
+      reject(new Error("Telegram SDK load failed"));
+    };
+
+    document.head.appendChild(script);
+  }).catch((error) => {
+    sdkLoadPromise = null;
+    throw error;
+  });
+
+  return sdkLoadPromise;
+}
+
+/**
+ * Initializes the Telegram WebApp: loads SDK only inside Mini App, then ready/expand/theme.
+ * In a normal browser this is a no-op and never requests telegram.org.
+ */
+export async function initTelegram(): Promise<TelegramWebApp | null> {
+  try {
+    await loadTelegramSdk();
+  } catch (error) {
+    console.warn("[telegram] WebApp SDK unavailable:", error);
+    return null;
+  }
+
   const webApp = getWebApp();
   if (!webApp) return null;
 

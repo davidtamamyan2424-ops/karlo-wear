@@ -7,16 +7,23 @@ import { ToastProvider } from "./components/Toast";
 import { initTelegram } from "./telegram/webapp";
 import "./index.css";
 
-initTelegram();
+async function bootstrap() {
+  // В обычном браузере — мгновенно, без запроса к telegram.org.
+  // В Mini App — сначала SDK, затем ready()/expand().
+  await initTelegram();
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <BrowserRouter>
-      <ToastProvider>
-        <CartProvider>
-          <App />
-        </CartProvider>
-      </ToastProvider>
-    </BrowserRouter>
-  </StrictMode>,
-);
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <BrowserRouter>
+        <ToastProvider>
+          <CartProvider>
+            <App />
+          </CartProvider>
+        </ToastProvider>
+      </BrowserRouter>
+    </StrictMode>,
+  );
+}
+
+void bootstrap();
+
