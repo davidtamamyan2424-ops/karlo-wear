@@ -8,6 +8,7 @@ import {
 } from "react";
 import { isIntentionalTap } from "../lib/intentionalTap";
 import { useImageCarousel } from "../lib/imageCarousel";
+import { fullSrc } from "../lib/images";
 
 interface ImageGalleryProps {
   images: string[];
@@ -40,8 +41,9 @@ export default function ImageGallery({
 }: ImageGalleryProps) {
   const list = useMemo(() => {
     if (images.length === 0) return [""];
-    if (loadMode === "cover") return [images[0]];
-    return images;
+    const mapped = images.map((url) => (url ? fullSrc(url) : ""));
+    if (loadMode === "cover") return [mapped[0]];
+    return mapped;
   }, [images, loadMode]);
 
   const hasMultiple = list.length > 1 && loadMode === "progressive";

@@ -8,6 +8,7 @@ import CartPriceSummary from "../components/CartPriceSummary";
 import DeliveryMethodPicker from "../components/DeliveryMethodPicker";
 import { CartPromoBlocks } from "../components/CartPromoBlocks";
 import { calcDeliveryFee } from "../lib/delivery";
+import { thumbSrc } from "../lib/images";
 
 export default function CartPage() {
   const { items, pricing, deliveryMethod, setDeliveryMethod, setQuantity, removeItem } = useCart();
@@ -57,7 +58,7 @@ export default function CartPage() {
             <div className="h-24 w-20 shrink-0 overflow-hidden rounded-xl2 bg-line">
               {item.imageUrl && (
                 <img
-                  src={item.imageUrl}
+                  src={thumbSrc(item.imageUrl)}
                   alt={item.name}
                   loading="lazy"
                   className="h-full w-full object-cover"

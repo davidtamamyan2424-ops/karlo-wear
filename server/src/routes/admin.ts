@@ -221,14 +221,20 @@ adminRouter.delete(
   }),
 );
 
-// Загрузка изображений товара (несколько файлов)
+// Загрузка изображений товара (несколько файлов) → WebP full + thumb
 adminRouter.post(
   "/products/images",
   uploadProductImages.array("images", 20),
   asyncHandler(async (req, res) => {
     const files = (req.files as Express.Multer.File[] | undefined) ?? [];
     if (files.length === 0) throw badRequest("Не выбрано ни одного изображения");
-    const urls = files.map((file) => `${UPLOADS_URL_PREFIX}/${file.filename}`);
+
+    const { optimizeProductImageFile } = await import("../lib/imageOptimize.js");
+    const urls: string[] = [];
+    for (const file of files) {
+      const optimized = await optimizeProductImageFile(file.path);
+      urls.push(optimized.fullUrl);
+    }
     res.status(201).json({ urls });
   }),
 );

@@ -10,6 +10,7 @@ import { hapticImpact, hapticNotify, hapticSelection } from "../telegram/webapp"
 import LazyImage from "./LazyImage";
 import ColorSwatch from "./ColorSwatch";
 import VariantImagePlaceholder from "./VariantImagePlaceholder";
+import { thumbSrc } from "../lib/images";
 
 interface Props {
   item: CatalogItem;
@@ -29,8 +30,9 @@ export default function ProductCard({ item, showColor = true, priority = false }
   const [flash, setFlash] = useState(false);
 
   const variantPrice = variant.price ?? product.price;
-  // В каталоге только первая фотография варианта — остальные грузятся на странице товара.
+  // В каталоге только thumb первого фото — full грузится на странице товара.
   const coverUrl = variant.images[0] ?? variant.imageUrl ?? null;
+  const coverThumb = coverUrl ? thumbSrc(coverUrl) : null;
 
   const open = () =>
     navigate(`/product/${product.id}?variant=${encodeURIComponent(variant.id)}`);
@@ -67,7 +69,7 @@ export default function ProductCard({ item, showColor = true, priority = false }
   return (
     <div className="group flex flex-col rounded-card bg-card p-2 shadow-card">
       <div className="relative">
-        {coverUrl ? (
+        {coverThumb ? (
           <button
             type="button"
             onClick={open}
@@ -76,7 +78,7 @@ export default function ProductCard({ item, showColor = true, priority = false }
             aria-label={product.name}
           >
             <LazyImage
-              src={coverUrl}
+              src={coverThumb}
               alt={product.name}
               eager={priority}
               className="h-full w-full object-cover"

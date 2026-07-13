@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ru } from "../../i18n/ru";
 import { PRODUCT_BADGE_LABELS, type ProductBadge } from "../../constants";
 import type { Product } from "../../types";
-import { fileUrl } from "../../api/client";
+import { thumbSrc } from "../../lib/images";
 import { ApiError } from "../../api/client";
 import { formatPrice } from "../../lib/format";
 import {
@@ -21,7 +21,7 @@ const t = ru.admin.products;
 
 function imgSrc(url: string | null): string | null {
   if (!url) return null;
-  return url.startsWith("http") ? url : fileUrl(url);
+  return thumbSrc(url);
 }
 
 export default function AdminProducts({ token, archived = false }: { token: string; archived?: boolean }) {

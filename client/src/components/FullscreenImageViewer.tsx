@@ -10,6 +10,7 @@ import { ru } from "../i18n/ru";
 import {
   useImageCarousel,
 } from "../lib/imageCarousel";
+import { fullSrc } from "../lib/images";
 
 interface Props {
   images: string[];
@@ -415,7 +416,7 @@ export default function FullscreenImageViewer({ images, initialIndex, alt, onClo
                 <div key={i} className="flex h-full w-full shrink-0 items-center justify-center px-2">
                   {allowed.has(i) ? (
                     <img
-                      src={image}
+                      src={fullSrc(image)}
                       alt={`${alt} — фото ${i + 1}`}
                       draggable={false}
                       className="max-h-full max-w-full select-none object-contain"
@@ -430,7 +431,7 @@ export default function FullscreenImageViewer({ images, initialIndex, alt, onClo
           ) : (
             <div className="flex h-full w-full items-center justify-center px-2">
               <img
-                src={src}
+                src={fullSrc(src)}
                 alt={`${alt} — фото ${index + 1}`}
                 draggable={false}
                 className="max-h-full max-w-full select-none object-contain will-change-transform"

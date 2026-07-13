@@ -11,6 +11,7 @@ import type { Product } from "../types";
 import type { Size } from "../constants";
 import type { DeliveryMethod } from "../constants";
 import { calcCartPricing, type CartPricing } from "../lib/promotions";
+import { toThumbUrl } from "../lib/images";
 
 export interface CartItem {
   key: string; // productId__variantId__size
@@ -133,7 +134,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           variantName: variant.name,
           sku: variant.sku,
           name: product.name,
-          imageUrl: variant.images[0] ?? variant.imageUrl ?? null,
+          imageUrl: toThumbUrl(variant.images[0] ?? variant.imageUrl ?? "") || null,
           price: variant.price ?? product.price,
           size,
           quantity: next,
