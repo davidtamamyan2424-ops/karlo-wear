@@ -74,6 +74,7 @@ export default function CatalogPage() {
               <ProductCard
                 item={item}
                 showColor={(multiColorProducts.get(item.product.id) ?? 0) > 1}
+                priority={i < 4}
               />
             </div>
           ))}

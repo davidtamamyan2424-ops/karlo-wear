@@ -1,6 +1,8 @@
 import {
   useEffect,
+  useMemo,
   useRef,
+  useState,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
@@ -18,8 +20,12 @@ interface ImageGalleryProps {
   aspect?: string;
   className?: string;
   rounded?: string;
-  /** Загружать первое изображение приоритетно. */
-  eagerFirst?: boolean;
+  /**
+   * progressive (по умолчанию): первое сразу, соседнее — preload,
+   * остальные — только после свайпа.
+   * cover: только первое изображение (каталог).
+   */
+  loadMode?: "progressive" | "cover";
 }
 
 export default function ImageGallery({
@@ -30,10 +36,15 @@ export default function ImageGallery({
   aspect = "4/5",
   className = "",
   rounded = "rounded-card",
-  eagerFirst = false,
+  loadMode = "progressive",
 }: ImageGalleryProps) {
-  const list = images.length > 0 ? images : [""];
-  const hasMultiple = list.length > 1;
+  const list = useMemo(() => {
+    if (images.length === 0) return [""];
+    if (loadMode === "cover") return [images[0]];
+    return images;
+  }, [images, loadMode]);
+
+  const hasMultiple = list.length > 1 && loadMode === "progressive";
 
   const carousel = useImageCarousel({
     slideCount: list.length,
@@ -43,25 +54,32 @@ export default function ImageGallery({
 
   const { index, containerRef, trackRef, goTo, isDragging } = carousel;
 
+  /** Индексы, для которых разрешена загрузка (src в DOM). */
+  const [allowed, setAllowed] = useState<Set<number>>(() => new Set([0]));
+
+  useEffect(() => {
+    carousel.resetTo(0);
+    setAllowed(new Set([0]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- сброс при смене набора фото
+  }, [list]);
+
+  useEffect(() => {
+    if (loadMode !== "progressive") return;
+    setAllowed((prev) => {
+      const next = new Set(prev);
+      next.add(index);
+      // Preload только следующего кадра.
+      if (index + 1 < list.length) next.add(index + 1);
+      return next;
+    });
+  }, [index, list.length, loadMode]);
+
   const tapRef = useRef({
     active: false,
     scrolling: false,
     maxDx: 0,
     maxDy: 0,
   });
-
-  useEffect(() => {
-    carousel.resetTo(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- сброс при смене набора фото
-  }, [images]);
-
-  useEffect(() => {
-    const next = list[index + 1];
-    if (next) {
-      const img = new Image();
-      img.src = next;
-    }
-  }, [index, list]);
 
   const fireTapIfNeeded = () => {
     const t = tapRef.current;
@@ -157,24 +175,30 @@ export default function ImageGallery({
           transition: isDragging ? "none" : "transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)",
         }}
       >
-        {list.map((src, i) => (
-          <div key={i} className="h-full w-full shrink-0">
-            {src ? (
-              <img
-                src={src}
-                alt={`${alt} — фото ${i + 1}`}
-                draggable={false}
-                loading={eagerFirst && i === 0 ? "eager" : "lazy"}
-                decoding="async"
-                className="h-full w-full select-none object-cover"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-muted">
-                {alt}
-              </div>
-            )}
-          </div>
-        ))}
+        {list.map((src, i) => {
+          const shouldLoad = Boolean(src) && (loadMode === "cover" || allowed.has(i));
+          return (
+            <div key={i} className="h-full w-full shrink-0 bg-surface">
+              {shouldLoad ? (
+                <img
+                  src={src}
+                  alt={`${alt} — фото ${i + 1}`}
+                  draggable={false}
+                  loading={i === 0 ? "eager" : "lazy"}
+                  decoding="async"
+                  fetchPriority={i === 0 ? "high" : "auto"}
+                  className="h-full w-full select-none object-cover"
+                />
+              ) : src ? (
+                <div className="h-full w-full animate-pulse bg-surface" aria-hidden />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-muted">
+                  {alt}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {hasMultiple && (

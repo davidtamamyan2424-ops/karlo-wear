@@ -141,7 +141,6 @@ export default function ProductPage() {
           images={variantImages}
           alt={product.name}
           aspect="3/4"
-          eagerFirst
           onImageClick={(index) => {
             setViewerIndex(index);
             setViewerOpen(true);

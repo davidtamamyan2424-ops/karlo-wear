@@ -7,16 +7,18 @@ import { formatPrice } from "../lib/format";
 import { useCart } from "../cart/CartContext";
 import { useToast } from "./Toast";
 import { hapticImpact, hapticNotify, hapticSelection } from "../telegram/webapp";
-import ImageGallery from "./ImageGallery";
+import LazyImage from "./LazyImage";
 import ColorSwatch from "./ColorSwatch";
 import VariantImagePlaceholder from "./VariantImagePlaceholder";
 
 interface Props {
   item: CatalogItem;
   showColor?: boolean;
+  /** Первые карточки в viewport — грузим обложку сразу. */
+  priority?: boolean;
 }
 
-export default function ProductCard({ item, showColor = true }: Props) {
+export default function ProductCard({ item, showColor = true, priority = false }: Props) {
   const { product, variant } = item;
   const navigate = useNavigate();
   const { addItem } = useCart();
@@ -27,7 +29,8 @@ export default function ProductCard({ item, showColor = true }: Props) {
   const [flash, setFlash] = useState(false);
 
   const variantPrice = variant.price ?? product.price;
-  const hasImages = variant.images.length > 0;
+  // В каталоге только первая фотография варианта — остальные грузятся на странице товара.
+  const coverUrl = variant.images[0] ?? variant.imageUrl ?? null;
 
   const open = () =>
     navigate(`/product/${product.id}?variant=${encodeURIComponent(variant.id)}`);
@@ -64,8 +67,21 @@ export default function ProductCard({ item, showColor = true }: Props) {
   return (
     <div className="group flex flex-col rounded-card bg-card p-2 shadow-card">
       <div className="relative">
-        {hasImages ? (
-          <ImageGallery images={variant.images} alt={product.name} onTap={open} aspect="4/5" />
+        {coverUrl ? (
+          <button
+            type="button"
+            onClick={open}
+            className="block w-full overflow-hidden rounded-card bg-surface"
+            style={{ aspectRatio: "4/5" }}
+            aria-label={product.name}
+          >
+            <LazyImage
+              src={coverUrl}
+              alt={product.name}
+              eager={priority}
+              className="h-full w-full object-cover"
+            />
+          </button>
         ) : (
           <VariantImagePlaceholder aspect="4/5" onTap={open} />
         )}

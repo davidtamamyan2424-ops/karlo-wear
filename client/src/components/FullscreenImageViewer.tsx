@@ -80,6 +80,9 @@ export default function FullscreenImageViewer({ images, initialIndex, alt, onClo
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dismissDy, setDismissDy] = useState(0);
   const [dismissAnimating, setDismissAnimating] = useState(false);
+  const [allowed, setAllowed] = useState<Set<number>>(
+    () => new Set([initialIndex, Math.min(initialIndex + 1, images.length - 1)].filter((i) => i >= 0)),
+  );
 
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
   const pinchRef = useRef({ active: false, startDist: 0, startScale: 1 });
@@ -115,6 +118,16 @@ export default function FullscreenImageViewer({ images, initialIndex, alt, onClo
     setDismissDy(0);
     setDismissAnimating(false);
   }, [index, resetZoom]);
+
+  useEffect(() => {
+    setAllowed((prev) => {
+      const next = new Set(prev);
+      next.add(index);
+      if (index + 1 < images.length) next.add(index + 1);
+      if (index - 1 >= 0) next.add(index - 1);
+      return next;
+    });
+  }, [index, images.length]);
 
   const closeAnimated = useCallback(() => {
     if (closingRef.current) return;
@@ -400,13 +413,17 @@ export default function FullscreenImageViewer({ images, initialIndex, alt, onClo
             >
               {images.map((image, i) => (
                 <div key={i} className="flex h-full w-full shrink-0 items-center justify-center px-2">
-                  <img
-                    src={image}
-                    alt={`${alt} — фото ${i + 1}`}
-                    draggable={false}
-                    className="max-h-full max-w-full select-none object-contain"
-                    onDoubleClick={i === index ? onDoubleClick : undefined}
-                  />
+                  {allowed.has(i) ? (
+                    <img
+                      src={image}
+                      alt={`${alt} — фото ${i + 1}`}
+                      draggable={false}
+                      className="max-h-full max-w-full select-none object-contain"
+                      onDoubleClick={i === index ? onDoubleClick : undefined}
+                    />
+                  ) : (
+                    <div className="h-40 w-40 animate-pulse rounded-lg bg-white/10" aria-hidden />
+                  )}
                 </div>
               ))}
             </div>
