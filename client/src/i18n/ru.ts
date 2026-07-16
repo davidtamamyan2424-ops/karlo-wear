@@ -302,6 +302,11 @@ export const ru = {
       moveUp: "Вверх",
       moveDown: "Вниз",
       reorderError: "Не удалось сохранить порядок товаров",
+      regenerateImages: "Пересоздать оптимизированные фото",
+      regenerateImagesConfirm:
+        "Пересоздать превью и полноразмерные WebP из сохранённых оригиналов? Это может занять несколько минут.",
+      regenerateImagesDone: "Готово: пересоздано {count}, без оригинала — {skipped}",
+      regenerateImagesBusy: "Пересоздание…",
       // Остатки
       sizesStock: "Остатки по размерам",
       totalStock: "Всего на складе",

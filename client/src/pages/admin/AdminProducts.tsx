@@ -11,6 +11,7 @@ import {
   adminFetchArchivedProducts,
   adminFetchProducts,
   adminPermanentDeleteProduct,
+  adminRegenerateProductImages,
   adminReorderProducts,
   adminRestoreProduct,
   adminUpdateProduct,
@@ -30,6 +31,8 @@ export default function AdminProducts({ token, archived = false }: { token: stri
   const [form, setForm] = useState<{ product: Product | null } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenerateMsg, setRegenerateMsg] = useState<string | null>(null);
   const reorderTimer = useRef<number | null>(null);
 
   const load = () => {
@@ -59,6 +62,26 @@ export default function AdminProducts({ token, archived = false }: { token: stri
       upsert(updated);
     } catch {
       setError(ru.common.error);
+    }
+  };
+
+  const regenerateImages = async () => {
+    if (!window.confirm(t.regenerateImagesConfirm)) return;
+    setRegenerating(true);
+    setRegenerateMsg(null);
+    setError(null);
+    try {
+      const { regenerated, skipped } = await adminRegenerateProductImages(token);
+      setRegenerateMsg(
+        t.regenerateImagesDone
+          .replace("{count}", String(regenerated))
+          .replace("{skipped}", String(skipped)),
+      );
+      load();
+    } catch {
+      setError(ru.common.error);
+    } finally {
+      setRegenerating(false);
     }
   };
 
@@ -169,16 +192,30 @@ export default function AdminProducts({ token, archived = false }: { token: stri
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-base font-semibold">{t.title}</h2>
-        <button
-          type="button"
-          onClick={() => setForm({ product: null })}
-          className="rounded-lg bg-tg-button px-3 py-1.5 text-xs font-medium text-tg-buttonText"
-        >
-          {t.add}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {!archived && (
+            <button
+              type="button"
+              disabled={regenerating}
+              onClick={() => void regenerateImages()}
+              className="rounded-lg bg-tg-secondaryBg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+            >
+              {regenerating ? t.regenerateImagesBusy : t.regenerateImages}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setForm({ product: null })}
+            className="rounded-lg bg-tg-button px-3 py-1.5 text-xs font-medium text-tg-buttonText"
+          >
+            {t.add}
+          </button>
+        </div>
       </div>
+
+      {regenerateMsg && <p className="text-sm text-green-700">{regenerateMsg}</p>}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       {!products && <p className="text-sm text-tg-hint">{t.loading}</p>}

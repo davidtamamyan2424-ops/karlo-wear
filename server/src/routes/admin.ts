@@ -229,13 +229,22 @@ adminRouter.post(
     const files = (req.files as Express.Multer.File[] | undefined) ?? [];
     if (files.length === 0) throw badRequest("Не выбрано ни одного изображения");
 
-    const { optimizeProductImageFile } = await import("../lib/imageOptimize.js");
+    const { ingestProductImage } = await import("../lib/imageOptimize.js");
     const urls: string[] = [];
     for (const file of files) {
-      const optimized = await optimizeProductImageFile(file.path);
+      const optimized = await ingestProductImage(file.path);
       urls.push(optimized.fullUrl);
     }
     res.status(201).json({ urls });
+  }),
+);
+
+adminRouter.post(
+  "/products/regenerate-images",
+  asyncHandler(async (_req, res) => {
+    const { regenerateAllProductImages } = await import("../services/regenerateProductImages.js");
+    const result = await regenerateAllProductImages();
+    res.json(result);
   }),
 );
 

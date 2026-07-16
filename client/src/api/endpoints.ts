@@ -154,6 +154,15 @@ export function adminFetchProducts(token: string): Promise<Product[]> {
   return apiRequest<Product[]>("/admin/products", { adminToken: token });
 }
 
+export function adminRegenerateProductImages(
+  token: string,
+): Promise<{ regenerated: number; skipped: number }> {
+  return apiRequest<{ regenerated: number; skipped: number }>(
+    "/admin/products/regenerate-images",
+    { method: "POST", adminToken: token },
+  );
+}
+
 export function adminFetchArchivedProducts(token: string): Promise<Product[]> {
   return apiRequest<Product[]>("/admin/products/archive", { adminToken: token });
 }

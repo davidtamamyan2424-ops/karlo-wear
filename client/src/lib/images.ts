@@ -6,7 +6,7 @@ export function mediaSrc(url: string): string {
   return url.startsWith("http") ? url : fileUrl(url);
 }
 
-/** Превью каталога (~480px WebP). Для legacy/внешних URL — тот же адрес. */
+/** Превью каталога (~550px WebP). Для legacy/внешних URL — тот же адрес. */
 export function toThumbUrl(url: string): string {
   if (!url) return url;
   if (/-full\.webp(\?|#|$)/i.test(url)) {

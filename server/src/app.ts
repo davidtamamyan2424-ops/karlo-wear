@@ -1,7 +1,8 @@
 import express, { type Application, type Request, type Response } from "express";
 import cors from "cors";
 import { env } from "./config/env.js";
-import { ensureUploadsDir, UPLOADS_DIR, UPLOADS_URL_PREFIX } from "./lib/uploads.js";
+import { ensureUploadsDir } from "./lib/uploads.js";
+import { publicUploadsMiddleware, UPLOADS_URL_PREFIX } from "./lib/publicUploads.js";
 import { productsRouter } from "./routes/products.js";
 import { ordersRouter } from "./routes/orders.js";
 import { adminRouter } from "./routes/admin.js";
@@ -20,8 +21,8 @@ export function createApp(): Application {
   );
   app.use(express.json());
 
-  // Загруженные чеки об оплате
-  app.use(UPLOADS_URL_PREFIX, express.static(UPLOADS_DIR));
+  // Загруженные файлы (оригиналы фото недоступны публично)
+  app.use(UPLOADS_URL_PREFIX, publicUploadsMiddleware);
 
   // Health check
   app.get("/api/health", (_req: Request, res: Response) => {

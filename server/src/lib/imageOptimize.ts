@@ -1,27 +1,23 @@
-import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
+import { ALLOWED_IMAGE_EXT } from "../constants.js";
 import { UPLOADS_DIR, UPLOADS_URL_PREFIX } from "./uploads.js";
 
-const THUMB_WIDTH = 480;
-const FULL_WIDTH = 1400;
-const THUMB_TARGET_MAX_BYTES = 100 * 1024;
-const FULL_TARGET_MAX_BYTES = 250 * 1024;
-const THUMB_MIN_QUALITY = 55;
-const FULL_MIN_QUALITY = 60;
+const THUMB_WIDTH = 550;
+const FULL_WIDTH = 1800;
+const THUMB_QUALITY = 86;
+const FULL_QUALITY = 90;
 
 export interface OptimizedProductImage {
   /** Публичный URL полноразмерного WebP (хранится в БД). */
   fullUrl: string;
   /** Публичный URL превью WebP для каталога. */
   thumbUrl: string;
+  /** Имя файла оригинала на диске (не отдаётся публично). */
+  originalFileName: string;
   fullFileName: string;
   thumbFileName: string;
-}
-
-function newImageId(): string {
-  return `${Date.now()}-${crypto.randomBytes(8).toString("hex")}`;
 }
 
 export function isLocalUploadUrl(url: string): boolean {
@@ -30,6 +26,10 @@ export function isLocalUploadUrl(url: string): boolean {
 
 export function isOptimizedFullUrl(url: string): boolean {
   return /-full\.webp(\?|#|$)/i.test(url);
+}
+
+export function isOriginalUploadFile(fileName: string): boolean {
+  return /-original\./i.test(fileName);
 }
 
 export function thumbUrlFromFull(fullUrl: string): string {
@@ -46,60 +46,56 @@ export function fullUrlFromThumb(thumbUrl: string): string {
   return thumbUrl;
 }
 
-async function encodeWebpToTarget(
-  input: Buffer,
-  width: number,
-  targetMaxBytes: number,
-  startQuality: number,
-  minQuality: number,
-): Promise<Buffer> {
-  let quality = startQuality;
-  let best: Buffer | null = null;
-
-  while (quality >= minQuality) {
-    const buf = await sharp(input)
-      .rotate()
-      .resize({
-        width,
-        height: width,
-        fit: "inside",
-        withoutEnlargement: true,
-      })
-      .webp({ quality, effort: 4 })
-      .toBuffer();
-
-    best = buf;
-    if (buf.length <= targetMaxBytes) return buf;
-    quality -= 8;
-  }
-
-  return best!;
+export function baseFromOptimizedFull(fileName: string): string | null {
+  const match = /^(.+)-full\.webp$/i.exec(fileName);
+  return match?.[1] ?? null;
 }
 
-/**
- * Создаёт full (≈1400px) и thumb (≈480px) WebP из загруженного файла.
- * Исходный файл удаляется после успешной обработки.
- */
-export async function optimizeProductImageFile(inputPath: string): Promise<OptimizedProductImage> {
-  const input = await fs.readFile(inputPath);
-  const id = newImageId();
-  const fullFileName = `${id}-full.webp`;
-  const thumbFileName = `${id}-thumb.webp`;
-  const fullPath = path.join(UPLOADS_DIR, fullFileName);
-  const thumbPath = path.join(UPLOADS_DIR, thumbFileName);
+function normalizeExt(ext: string): string {
+  const lower = ext.toLowerCase();
+  return (ALLOWED_IMAGE_EXT as readonly string[]).includes(lower) ? lower : ".jpg";
+}
 
-  const [fullBuf, thumbBuf] = await Promise.all([
-    encodeWebpToTarget(input, FULL_WIDTH, FULL_TARGET_MAX_BYTES, 82, FULL_MIN_QUALITY),
-    encodeWebpToTarget(input, THUMB_WIDTH, THUMB_TARGET_MAX_BYTES, 75, THUMB_MIN_QUALITY),
+async function encodeWebp(input: Buffer, width: number, quality: number): Promise<Buffer> {
+  return sharp(input)
+    .rotate()
+    .resize({
+      width,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .webp({ quality, effort: 4 })
+    .toBuffer();
+}
+
+async function generateVariantsFromBuffer(input: Buffer): Promise<{ full: Buffer; thumb: Buffer }> {
+  const [full, thumb] = await Promise.all([
+    encodeWebp(input, FULL_WIDTH, FULL_QUALITY),
+    encodeWebp(input, THUMB_WIDTH, THUMB_QUALITY),
   ]);
+  return { full, thumb };
+}
 
-  await Promise.all([fs.writeFile(fullPath, fullBuf), fs.writeFile(thumbPath, thumbBuf)]);
-
+export async function findOriginalPathForBase(base: string): Promise<string | null> {
+  let files: string[];
   try {
-    await fs.unlink(inputPath);
+    files = await fs.readdir(UPLOADS_DIR);
   } catch {
-    /* исходник мог уже отсутствовать */
+    return null;
   }
+  const originalName = files.find((f) => f.startsWith(`${base}-original.`));
+  return originalName ? path.join(UPLOADS_DIR, originalName) : null;
+}
+
+async function writeVariants(base: string, input: Buffer): Promise<Omit<OptimizedProductImage, "originalFileName">> {
+  const { full, thumb } = await generateVariantsFromBuffer(input);
+  const fullFileName = `${base}-full.webp`;
+  const thumbFileName = `${base}-thumb.webp`;
+
+  await Promise.all([
+    fs.writeFile(path.join(UPLOADS_DIR, fullFileName), full),
+    fs.writeFile(path.join(UPLOADS_DIR, thumbFileName), thumb),
+  ]);
 
   return {
     fullUrl: `${UPLOADS_URL_PREFIX}/${fullFileName}`,
@@ -109,22 +105,66 @@ export async function optimizeProductImageFile(inputPath: string): Promise<Optim
   };
 }
 
-/** Если есть full, но нет thumb — догенерировать превью. */
+/**
+ * Сохраняет загрузку как {base}-original.ext и генерирует thumb + full WebP.
+ * Оригинал никогда не удаляется.
+ */
+export async function ingestProductImage(inputPath: string): Promise<OptimizedProductImage> {
+  const ext = normalizeExt(path.extname(inputPath));
+  const base = path.basename(inputPath, path.extname(inputPath));
+  const originalFileName = `${base}-original${ext}`;
+  const originalPath = path.join(UPLOADS_DIR, originalFileName);
+
+  await fs.rename(inputPath, originalPath);
+  const input = await fs.readFile(originalPath);
+  const variants = await writeVariants(base, input);
+
+  return { ...variants, originalFileName };
+}
+
+/** @deprecated Используйте ingestProductImage */
+export const optimizeProductImageFile = ingestProductImage;
+
+/** Пересоздаёт thumb + full из сохранённого оригинала. */
+export async function regenerateVariantsForBase(base: string): Promise<boolean> {
+  const originalPath = await findOriginalPathForBase(base);
+  if (!originalPath) return false;
+
+  const input = await fs.readFile(originalPath);
+  await writeVariants(base, input);
+  return true;
+}
+
+export async function regenerateVariantsFromFullUrl(fullUrl: string): Promise<boolean> {
+  if (!isLocalUploadUrl(fullUrl) || !isOptimizedFullUrl(fullUrl)) return false;
+  const fileName = path.basename(fullUrl.split("?")[0]);
+  const base = baseFromOptimizedFull(fileName);
+  if (!base) return false;
+  return regenerateVariantsForBase(base);
+}
+
+/** Если есть full, но нет thumb — догенерировать (из оригинала или full). */
 export async function ensureThumbForFull(fullUrl: string): Promise<string | null> {
   if (!isLocalUploadUrl(fullUrl) || !isOptimizedFullUrl(fullUrl)) return null;
 
   const fullName = path.basename(fullUrl.split("?")[0]);
   const thumbName = fullName.replace(/-full\.webp$/i, "-thumb.webp");
-  const fullPath = path.join(UPLOADS_DIR, fullName);
   const thumbPath = path.join(UPLOADS_DIR, thumbName);
+  const base = baseFromOptimizedFull(fullName);
+
+  if (base && (await findOriginalPathForBase(base))) {
+    await regenerateVariantsForBase(base);
+    return `${UPLOADS_URL_PREFIX}/${thumbName}`;
+  }
 
   try {
     await fs.access(thumbPath);
     return `${UPLOADS_URL_PREFIX}/${thumbName}`;
   } catch {
-    /* generate */
+    /* generate from full (legacy без оригинала) */
   }
 
+  const fullPath = path.join(UPLOADS_DIR, fullName);
   try {
     await fs.access(fullPath);
   } catch {
@@ -132,40 +172,53 @@ export async function ensureThumbForFull(fullUrl: string): Promise<string | null
   }
 
   const input = await fs.readFile(fullPath);
-  const thumbBuf = await encodeWebpToTarget(
-    input,
-    THUMB_WIDTH,
-    THUMB_TARGET_MAX_BYTES,
-    75,
-    THUMB_MIN_QUALITY,
-  );
+  const thumbBuf = await encodeWebp(input, THUMB_WIDTH, THUMB_QUALITY);
   await fs.writeFile(thumbPath, thumbBuf);
   return `${UPLOADS_URL_PREFIX}/${thumbName}`;
 }
 
 /**
- * Оптимизирует legacy-файл (jpg/png/webp без суффикса -full) → full+thumb.
- * Возвращает новый full URL или null, если файл недоступен.
+ * Legacy: jpg/png/webp без суффиксов → сохранить как -original, создать -full/-thumb.
+ * Уже оптимизированные -full.webp продолжают работать.
  */
 export async function optimizeLegacyUpload(url: string): Promise<string | null> {
   if (!isLocalUploadUrl(url)) return null;
+
   if (isOptimizedFullUrl(url)) {
     await ensureThumbForFull(url);
     return url;
   }
+
   if (/-thumb\.webp(\?|#|$)/i.test(url)) {
     return fullUrlFromThumb(url);
   }
 
   const fileName = path.basename(url.split("?")[0]);
-  const inputPath = path.join(UPLOADS_DIR, fileName);
+  if (isOriginalUploadFile(fileName)) {
+    const base = fileName.replace(/-original\.[^.]+$/i, "");
+    if (await regenerateVariantsForBase(base)) {
+      return `${UPLOADS_URL_PREFIX}/${base}-full.webp`;
+    }
+    return null;
+  }
 
+  const inputPath = path.join(UPLOADS_DIR, fileName);
   try {
     await fs.access(inputPath);
   } catch {
     return null;
   }
 
-  const optimized = await optimizeProductImageFile(inputPath);
-  return optimized.fullUrl;
+  const ext = normalizeExt(path.extname(fileName));
+  const base = path.basename(fileName, path.extname(fileName));
+  const originalFileName = `${base}-original${ext}`;
+  const originalPath = path.join(UPLOADS_DIR, originalFileName);
+
+  if (fileName !== originalFileName) {
+    await fs.rename(inputPath, originalPath);
+  }
+
+  const input = await fs.readFile(originalPath);
+  const variants = await writeVariants(base, input);
+  return variants.fullUrl;
 }
