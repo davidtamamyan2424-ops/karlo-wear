@@ -1,9 +1,7 @@
 import { Link } from "react-router-dom";
-import ThreadOrnament from "../components/ThreadOrnament";
 export default function HomePage() {
   return (
     <div className="kw-home animate-fade-in space-y-7">
-      <div className="kw-thread-stage" aria-hidden="true"><ThreadOrnament side="left" /><ThreadOrnament side="right" /></div>
       <section className="relative isolate overflow-hidden rounded-card bg-surface px-6 py-20 text-center">
         <div className="kw-hero-mark" aria-hidden="true">✦</div>
         <p className="text-xs uppercase tracking-[0.3em] text-muted">Karlo Wear / Unisex</p>
