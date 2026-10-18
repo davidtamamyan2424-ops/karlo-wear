@@ -1,10 +1,13 @@
 import { Link } from "react-router-dom";
+import ThreadOrnament from "../components/ThreadOrnament";
 export default function HomePage() {
   return (
     <div className="animate-fade-in space-y-7">
-      <section className="rounded-card bg-surface px-6 py-14 text-center">
+      <div className="kw-thread-stage" aria-hidden="true"><ThreadOrnament side="left" /><ThreadOrnament side="right" /></div>
+      <section className="relative isolate overflow-hidden rounded-card bg-surface px-6 py-20 text-center">
+        <div className="kw-hero-mark" aria-hidden="true">✦</div>
         <p className="text-xs uppercase tracking-[0.3em] text-muted">Karlo Wear / Unisex</p>
-        <h1 className="mt-5 text-4xl font-semibold tracking-tight text-ink">Одежда с характером</h1>
+        <h1 className="mt-5 text-4xl font-semibold tracking-tight text-ink">Нити истории. Свобода формы.</h1>
         <p className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-muted">Современные силуэты, восточные мотивы и свобода быть собой.</p>
         <Link to="/catalog" className="mt-8 inline-block rounded-full bg-ink px-7 py-3 text-sm font-medium text-white">Смотреть каталог →</Link>
       </section>
