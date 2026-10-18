@@ -133,6 +133,7 @@ export interface ProductPayload {
   unitCost?: number;
   composition?: string | null;
   badge?: ProductBadge | null;
+  category?: "TSHIRT" | "HOODIE" | "PANTS" | null;
   images?: string[];
   sizeChartUrl?: string | null;
   isActive?: boolean;
