@@ -68,6 +68,7 @@ export async function createOrder(input: CreateOrderInput) {
       variantSku: string | null;
       sizeLabel: string;
       unitPrice: number;
+      category: string | null;
       quantity: number;
     }[] = [];
 
@@ -114,12 +115,13 @@ export async function createOrder(input: CreateOrderInput) {
         variantSku: size.variant.sku,
         sizeLabel: size.label,
         unitPrice: size.variant.price ?? size.variant.product.price,
+        category: size.variant.product.category,
         quantity: item.quantity,
       });
     }
 
     const pricing = calcCartPricing(
-      lineItems.map((line) => ({ unitPrice: line.unitPrice, quantity: line.quantity })),
+      lineItems.map((line) => ({ unitPrice: line.unitPrice, quantity: line.quantity, category: line.category })),
     );
     const deliveryAmount =
       calcDeliveryFee(input.deliveryMethod as DeliveryMethod, pricing) ?? 0;
