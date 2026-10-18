@@ -74,23 +74,23 @@ body {
   }
 }
 
-/* Decorative threads draw downward and weave along the homepage edges. */
-.kw-thread-stage { position: absolute; inset: 70px 0 auto; height: 650px; pointer-events: none; overflow: hidden; z-index: 0; }
-.kw-threads { position: absolute; top: 0; width: clamp(55px, 13vw, 170px); height: 620px; opacity: .8; }
+
+/* Scroll-revealed oriental carpet weave, full height of the home page. */
+.kw-thread-stage { position: absolute; inset: 0; height: 100%; pointer-events: none; overflow: hidden; z-index: 0; }
+.kw-threads { position: absolute; top: 0; bottom: 0; width: clamp(60px, 13vw, 125px); display: flex; flex-direction: column; justify-content: space-around; opacity: .68; }
 .kw-threads--left { left: max(0px, calc((100vw - 850px) / 2)); }
 .kw-threads--right { right: max(0px, calc((100vw - 850px) / 2)); transform: scaleX(-1); }
-.kw-thread { stroke-dasharray: 950; stroke-dashoffset: 950; animation: kw-weave 5.5s cubic-bezier(.3,.1,.2,1) forwards; }
-.kw-thread--motif { animation-delay: 2.5s; }
+.kw-woven-tile { display: block; flex: 1 1 0; width: 100%; min-height: 0; overflow: visible; }
+.kw-woven-stroke { stroke-dasharray: 550; stroke-dashoffset: 550; transition: stroke-dashoffset 1.8s ease; }
+.kw-woven-tile--visible .kw-woven-stroke { stroke-dashoffset: 0; }
 .kw-hero-mark { font-size: 38px; color: #a73337; margin-bottom: 16px; animation: kw-mark 5s ease-in-out infinite; }
-@keyframes kw-weave { to { stroke-dashoffset: 0; } }
 @keyframes kw-mark { 50% { opacity: .5; transform: rotate(45deg) scale(.9); } }
 @media (max-width: 680px) {
-  .kw-thread-stage { opacity: .38; }
-  .kw-threads { width: 58px; }
+  .kw-threads { width: 54px; opacity: .36; }
   .kw-threads--left { left: 0; }
   .kw-threads--right { right: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .kw-thread { stroke-dashoffset: 0; }
+  .kw-woven-stroke { stroke-dashoffset: 0; transition: none; }
   .kw-hero-mark { animation: none; }
 }
