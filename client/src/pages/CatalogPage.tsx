@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { fetchProducts } from "../api/endpoints";
 import { ru } from "../i18n/ru";
 import ProductCard from "../components/ProductCard";
@@ -18,7 +19,9 @@ function Skeleton() {
 export default function CatalogPage() {
   const [products, setProducts] = useState<Awaited<ReturnType<typeof fetchProducts>> | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [category, setCategory] = useState("ALL");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const category = searchParams.get("category") ?? "ALL";
+  const setCategory = (value: string) => setSearchParams(value === "ALL" ? {} : { category: value });
 
   useEffect(() => {
     fetchProducts()
