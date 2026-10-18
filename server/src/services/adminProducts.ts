@@ -141,6 +141,7 @@ export async function createProduct(input: CreateProductBody) {
         price: input.price,
         currency: "RUB",
         composition: input.composition ?? null,
+        category: input.category ?? null,
         badge: input.badge ?? null,
         isActive: input.isActive ?? true,
         archived: false,
@@ -193,6 +194,7 @@ export async function updateProduct(id: string, input: UpdateProductBody) {
   if (input.isActive !== undefined) data.isActive = input.isActive;
   if ("description" in input) data.description = input.description ?? null;
   if ("composition" in input) data.composition = input.composition ?? null;
+  if ("category" in input) data.category = input.category ?? null;
   if ("badge" in input) data.badge = input.badge ?? null;
   if ("sizeChartUrl" in input) data.sizeChartUrl = input.sizeChartUrl ?? null;
   if (input.unitCost !== undefined) data.unitCost = input.unitCost;
