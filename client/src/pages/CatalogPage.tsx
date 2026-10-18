@@ -62,10 +62,6 @@ export default function CatalogPage() {
         ))}
       </div>
       <PromoCarousel />
-      <div className="my-4 rounded-card border border-line bg-paper px-4 py-3 text-sm">
-        <strong>Худи + брюки = −10%</strong>
-        <p className="mt-1 text-muted">Соберите комплект из любых моделей — скидка применится автоматически.</p>
-      </div>
 
       {error && <p className="py-8 text-center text-sm text-red-600">{error}</p>}
 
