@@ -73,3 +73,42 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
+
+
+
+/* Two independent embroidered side borders, never overlapping the 672px content column. */
+.kw-home { position: relative; isolation: isolate; }
+.kw-home > section { position: relative; z-index: 1; }
+.kw-thread-stage {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100vw;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.kw-threads {
+  position: absolute;
+  top: 0;
+  width: 112px;
+  height: 100%;
+  overflow: hidden;
+  opacity: .88;
+}
+.kw-threads--left { right: calc(50% + 336px + 24px); }
+.kw-threads--right { left: calc(50% + 336px + 24px); transform: scaleX(-1); }
+.kw-embroidery-tile { height: 224px; width: 112px; }
+.kw-embroidery-tile svg { display: block; width: 100%; height: 100%; }
+.kw-stitch { stroke-dasharray: 8; stroke-dashoffset: 8; transition: stroke-dashoffset 1.3s ease-out; }
+.kw-embroidery-tile--active .kw-stitch { stroke-dashoffset: 0; }
+.kw-hero-mark { font-size: 38px; color: #a73337; margin-bottom: 16px; animation: kw-mark 5s ease-in-out infinite; }
+@keyframes kw-mark { 50% { opacity: .5; transform: rotate(45deg) scale(.9); } }
+/* If there is no room for 112px side bands + 24px gaps, keep the content unobstructed. */
+@media (max-width: 960px) { .kw-thread-stage { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .kw-stitch { stroke-dashoffset: 0; transition: none; }
+  .kw-hero-mark { animation: none; }
+}

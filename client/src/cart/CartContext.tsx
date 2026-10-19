@@ -21,6 +21,7 @@ export interface CartItem {
   sku: string;
   name: string;
   imageUrl: string | null;
+  category: string | null;
   price: number; // в копейках
   size: Size;
   quantity: number;
@@ -135,6 +136,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           sku: variant.sku,
           name: product.name,
           imageUrl: toThumbUrl(variant.images[0] ?? variant.imageUrl ?? "") || null,
+          category: product.category,
           price: variant.price ?? product.price,
           size,
           quantity: next,
@@ -164,7 +166,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const clear = useCallback(() => setItems([]), []);
 
   const value = useMemo<CartContextValue>(() => {
-    const lines = items.map((i) => ({ unitPrice: i.price, quantity: i.quantity }));
+    const lines = items.map((i) => ({ unitPrice: i.price, quantity: i.quantity, category: i.category }));
     const pricing = calcCartPricing(lines);
     const count = pricing.unitCount;
     return {

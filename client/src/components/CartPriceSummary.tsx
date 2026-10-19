@@ -36,7 +36,7 @@ export default function CartPriceSummary({ pricing, deliveryFee }: Props) {
       </div>
 
       <div className="flex justify-between text-muted">
-        <span>{t.secondItemDiscount}</span>
+        <span>Скидка за комплект −10%</span>
         <span className={hasDiscount ? "font-medium text-emerald-700" : ""}>
           {hasDiscount ? `−${formatPrice(pricing.discount)}` : formatPrice(0)}
         </span>

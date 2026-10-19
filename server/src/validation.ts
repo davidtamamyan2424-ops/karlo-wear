@@ -200,6 +200,7 @@ export const createProductSchema = z.object({
   unitCost: z.number().int().min(0).optional(),
   composition: z.string().trim().max(200).optional().nullable(),
   badge: z.enum(PRODUCT_BADGES).optional().nullable(),
+  category: z.enum(["TSHIRT", "HOODIE", "PANTS"]).optional().nullable(),
   images: productImagesSchema.optional(),
   sizeChartUrl: z.string().trim().min(1).max(1000).optional().nullable(),
   isActive: z.boolean().optional(),

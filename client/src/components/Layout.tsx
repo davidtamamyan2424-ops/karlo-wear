@@ -9,7 +9,7 @@ export default function Layout() {
   const { count } = useCart();
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin");
-  const isCatalog = location.pathname === "/";
+  const isCatalog = location.pathname === "/" || location.pathname === "/catalog";
   const showBack = !isCatalog;
 
   return (
