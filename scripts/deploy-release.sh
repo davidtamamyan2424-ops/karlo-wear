@@ -19,6 +19,9 @@ backup="/var/backups/karlo-wear/deploy-$(date +%Y%m%d-%H%M%S)-${sha:0:12}"
 mkdir -m 755 "$release"
 install -d -m 700 "$backup"
 cp -a "$payload/package.json" "$payload/package-lock.json" "$payload/client" "$payload/server" "$payload/scripts" "$release/"
+for path in ops ecosystem.config.cjs; do
+  if [ -e "$payload/$path" ]; then cp -a "$payload/$path" "$release/"; fi
+done
 cp "$previous/server/.env" "$release/server/.env"
 chmod 640 "$release/server/.env"
 if [ -f "$previous/client/.env" ]; then cp "$previous/client/.env" "$release/client/.env"; fi

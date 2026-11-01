@@ -28,7 +28,9 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         run: |
           files=(package.json package-lock.json client/package.json client/index.html client/src client/*.json client/*.js client/*.ts server/package.json server/tsconfig.json server/src server/prisma scripts)
-          if [ -d client/public ]; then files+=(client/public); fi
+          for path in client/public ops ecosystem.config.cjs server/scripts server/test-integration.mjs; do
+            if [ -e "$path" ]; then files+=("$path"); fi
+          done
           tar -czf /tmp/karlo-source.tar.gz "${files[@]}"
       - uses: actions/upload-artifact@v4
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
