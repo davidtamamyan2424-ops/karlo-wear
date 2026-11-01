@@ -20,8 +20,8 @@ export const ru = {
     goToSlide: "Слайд",
     slides: [
       {
-        title: "Вторая футболка выгоднее",
-        subtitle: "Скидка 10% на каждый второй товар в корзине",
+        title: "THE SET · Худи + брюки −10%",
+        subtitle: "Любые модели, цвета и размеры. Скидка на комплект автоматически в корзине",
       },
       {
         title: "Бесплатная доставка от 12 000 ₽",
@@ -66,7 +66,7 @@ export const ru = {
     products: "Стоимость товаров",
     withDiscount: "Со скидкой",
     discount: "Скидка",
-    secondItemDiscount: "Скидка на второй товар",
+    secondItemDiscount: "Скидка на комплект",
     delivery: "Доставка",
     deliveryCost: "Стоимость доставки",
     deliveryFree: "Бесплатно",
@@ -78,7 +78,7 @@ export const ru = {
     checkout: "Оформить заказ",
     continueShopping: "Продолжить покупки",
     maxStockReached: "Больше нет в наличии",
-    discountUpsell: "Добавьте ещё 1 товар и получите скидку 10% на вторую футболку",
+    discountUpsell: "Худи + брюки — скидка 10% на комплект",
     freeDeliveryRemainingLabel: "До бесплатной доставки осталось",
     freeDeliveryCongratsTitle: "Поздравляем!",
     freeDeliveryCongratsText: "Для вашего заказа действует бесплатная доставка",

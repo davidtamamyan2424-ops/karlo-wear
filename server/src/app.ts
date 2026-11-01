@@ -7,11 +7,22 @@ import { productsRouter } from "./routes/products.js";
 import { ordersRouter } from "./routes/orders.js";
 import { adminRouter } from "./routes/admin.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import helmet from 'helmet';
+import { sessions, protectOrigin } from './middleware/session.js';
+import { apiLimit } from './middleware/limits.js';
+import { prisma } from './lib/prisma.js';
 
 export function createApp(): Application {
   ensureUploadsDir();
 
   const app = express();
+  app.disable('x-powered-by');
+  app.set('trust proxy', 'loopback');
+  app.use(helmet({
+    contentSecurityPolicy: false, // HTML policy is set by Nginx; Telegram Web embeds need explicit ancestors.
+    crossOriginResourcePolicy: { policy: 'same-site' },
+    strictTransportSecurity: env.isProduction ? { maxAge: 15552000, includeSubDomains: false } : false,
+  }));
 
   app.use(
     cors({
@@ -19,7 +30,10 @@ export function createApp(): Application {
       credentials: true,
     }),
   );
-  app.use(express.json());
+  app.use(express.json({ limit: '64kb' }));
+  app.use('/api', apiLimit, protectOrigin, sessions);
+  app.use('/api/admin', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
+  app.use('/api/orders', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
 
   // Загруженные файлы (оригиналы фото недоступны публично)
   app.use(UPLOADS_URL_PREFIX, publicUploadsMiddleware);
@@ -27,6 +41,10 @@ export function createApp(): Application {
   // Health check
   app.get("/api/health", (_req: Request, res: Response) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+  app.get('/api/ready', async (_req, res) => {
+    try { await prisma.$queryRaw`SELECT 1`; res.json({ status: 'ok' }); }
+    catch { res.status(503).json({ status: 'unavailable' }); }
   });
 
   // Маршруты API

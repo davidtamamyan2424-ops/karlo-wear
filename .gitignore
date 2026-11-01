@@ -45,3 +45,7 @@ coverage/
 # Cursor / Claude
 .cursor/
 .claude/
+.deploy-credentials/
+.test-data/
+server/private/
+release/

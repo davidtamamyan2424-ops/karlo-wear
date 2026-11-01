@@ -11,11 +11,10 @@ export function CartPromoBlocks({ pricing }: PromoBlocksProps) {
 
   return (
     <div className="space-y-3">
-      {pricing.unitCount === 1 && (
-        <div className="rounded-card border border-line bg-paper px-4 py-3.5">
-          <p className="text-sm font-medium text-ink">{t.discountUpsell}</p>
-        </div>
-      )}
+      <div className="rounded-card border border-line bg-paper px-4 py-3.5">
+        <p className="text-sm font-medium text-ink">Худи + брюки — скидка 10% на комплект</p>
+        <p className="mt-1 text-sm text-muted">Скидка применяется автоматически при добавлении обеих вещей в корзину.</p>
+      </div>
 
       {pricing.qualifiesFreeDelivery ? (
         <div className="rounded-card border border-line bg-paper px-4 py-3.5">

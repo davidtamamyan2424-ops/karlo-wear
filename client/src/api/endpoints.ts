@@ -1,4 +1,5 @@
 import { apiRequest, apiUpload } from "./client";
+import { orderAccess } from '../lib/orderAccess';
 import type {
   CreateOrderPayload,
   Order,
@@ -23,6 +24,8 @@ import { periodQueryString } from "../lib/period";
 import type { OrderStatus } from "../constants";
 
 export type OrderListFilter = {
+  limit?: number;
+  offset?: number;
   status?: OrderStatus;
   statusGroup?: "awaiting" | "paid" | "shipped" | "cancelled";
   period?: PeriodState;
@@ -40,20 +43,23 @@ export function fetchProduct(id: string): Promise<Product> {
 export function createOrder(payload: CreateOrderPayload): Promise<Order> {
   return apiRequest<Order>("/orders", { method: "POST", body: payload });
 }
+export function recoverOrder(idempotencyKey:string,accessToken:string):Promise<Order|null> {
+  return apiRequest('/orders/recover',{method:'POST',body:{idempotencyKey,accessToken}});
+}
 
 export function fetchOrder(id: string): Promise<Order> {
-  return apiRequest<Order>(`/orders/${id}`);
+  return apiRequest<Order>(`/orders/${id}`, { orderToken:orderAccess(id) });
 }
 
 export function uploadPaymentProof(orderId: string, file: File): Promise<Order> {
   const form = new FormData();
   form.append("receipt", file);
-  return apiUpload<Order>(`/orders/${orderId}/payment-proof`, form);
+  return apiUpload<Order>(`/orders/${orderId}/payment-proof`, form, {orderToken:orderAccess(orderId)});
 }
 
 // --- Админ-эндпоинты ---
 export function adminCheckSession(token: string): Promise<{ ok: boolean }> {
-  return apiRequest<{ ok: boolean }>("/admin/session", { adminToken: token });
+  return token ? apiRequest('/admin/login', { method:'POST', body:{token} }) : apiRequest('/admin/session');
 }
 
 function appendQuery(base: string, params: URLSearchParams): string {
@@ -63,6 +69,8 @@ function appendQuery(base: string, params: URLSearchParams): string {
 
 export function adminFetchOrders(token: string, filter: OrderListFilter = {}): Promise<Order[]> {
   const params = new URLSearchParams();
+  if (filter.limit) params.set('limit',String(filter.limit));
+  if (filter.offset) params.set('offset',String(filter.offset));
   if (filter.period) {
     const periodQs = new URLSearchParams(periodQueryString(filter.period).replace(/^\?/, ""));
     periodQs.forEach((v, k) => params.set(k, v));
@@ -127,12 +135,14 @@ export function adminUpdatePaymentAccount(
 
 // --- Управление товарами ---
 export interface ProductPayload {
+  expectedUpdatedAt?: string;
   name: string;
   description?: string | null;
   price: number; // в копейках
   unitCost?: number;
   composition?: string | null;
   badge?: ProductBadge | null;
+  category?: "TSHIRT" | "HOODIE" | "PANTS" | null;
   images?: string[];
   sizeChartUrl?: string | null;
   isActive?: boolean;
