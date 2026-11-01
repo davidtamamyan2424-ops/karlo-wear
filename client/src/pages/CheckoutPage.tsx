@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { ru } from "../i18n/ru";
 import { isCompleteRuPhone, normalizeRuPhone } from "../lib/phone";
@@ -18,6 +18,7 @@ import type { PickupPointType } from "../constants";
 export default function CheckoutPage() {
   const { items, pricing, deliveryMethod, setDeliveryMethod, clear } = useCart();
   const navigate = useNavigate();
+  const orderCreatedRef = useRef(false);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("+7");
@@ -50,7 +51,7 @@ export default function CheckoutPage() {
   }, []);
 
   useEffect(() => {
-    if (items.length === 0) navigate("/cart", { replace: true });
+    if (items.length === 0 && !orderCreatedRef.current) navigate("/cart", { replace: true });
   }, [items.length, navigate]);
 
   const needsCourierAddress =
@@ -144,8 +145,10 @@ export default function CheckoutPage() {
           quantity: i.quantity,
         })),
       });
-      clear();
+      // Prevent the empty-cart redirect from racing with payment navigation.
+      orderCreatedRef.current = true;
       navigate(`/order/${order.id}`, { replace: true });
+      clear();
     } catch (err) {
       setSubmitError(err instanceof ApiError ? err.message : ru.checkout.error);
     } finally {
