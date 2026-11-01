@@ -89,11 +89,8 @@ export async function createOrder(input: CreateOrderInput) {
       variantSku: string | null;
       sizeLabel: string;
       unitPrice: number;
-<<<<<<< HEAD
-=======
       unitCostSnapshot: number;
       costEstimated: boolean;
->>>>>>> origin/main
       category: string | null;
       quantity: number;
     }[] = [];
@@ -142,11 +139,8 @@ export async function createOrder(input: CreateOrderInput) {
         sizeLabel: size.label,
         unitPrice: size.variant.price ?? size.variant.product.price,
         category: size.variant.product.category,
-<<<<<<< HEAD
-=======
         unitCostSnapshot: size.variant.product.unitCost,
         costEstimated: size.variant.product.unitCost === 0,
->>>>>>> origin/main
         quantity: item.quantity,
       });
     }
