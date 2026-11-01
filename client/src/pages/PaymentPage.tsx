@@ -179,6 +179,15 @@ export default function PaymentPage() {
           {ru.payment.paidButton}
         </button>
       )}
+
+      {(success || order.paymentProofs.length > 0 || ['PAID', 'IN_PRODUCTION', 'SHIPPED', 'COMPLETED'].includes(order.status)) && (
+        <aside role="status" className="rounded-card border border-line bg-paper p-4 text-sm text-ink">
+          Для связи по всем вопросам обращайтесь в Telegram:{" "}
+          <a href="https://t.me/david_montano" target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-4">
+            @david_montano
+          </a>.
+        </aside>
+      )}
     </div>
   );
 }
