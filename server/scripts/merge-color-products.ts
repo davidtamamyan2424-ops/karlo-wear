@@ -17,6 +17,10 @@ const GROUPS = [
   "«Saw» свободные брюки unisex",
 ];
 
+function normalizeName(name: string): string {
+  return name.toLowerCase().replace(/[«»“”"\u0027]/g, "").replace(/\s+/g, " ").trim();
+}
+
 async function main() {
   const products = await prisma.product.findMany({
     where: { archived: false },
@@ -25,7 +29,7 @@ async function main() {
   });
   let changes = 0;
   for (const name of GROUPS) {
-    const group = products.filter(p => p.name.trim().toLowerCase() === name.toLowerCase());
+    const group = products.filter(p => normalizeName(p.name) === normalizeName(name));
     if (group.length < 2) { console.log("SKIP", name, group.length); continue; }
     const [target, ...sources] = group;
     const variants = group.flatMap(p => p.variants.map(v => ({ ...v, owner: p.id })));
