@@ -1,3 +1,4 @@
+import { transaction } from '../lib/transaction.js';
 import crypto from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
@@ -141,6 +142,7 @@ export async function createProduct(input: CreateProductBody) {
         price: input.price,
         currency: "RUB",
         composition: input.composition ?? null,
+        category: input.category ?? null,
         badge: input.badge ?? null,
         isActive: input.isActive ?? true,
         archived: false,
@@ -193,6 +195,7 @@ export async function updateProduct(id: string, input: UpdateProductBody) {
   if (input.isActive !== undefined) data.isActive = input.isActive;
   if ("description" in input) data.description = input.description ?? null;
   if ("composition" in input) data.composition = input.composition ?? null;
+  if ("category" in input) data.category = input.category ?? null;
   if ("badge" in input) data.badge = input.badge ?? null;
   if ("sizeChartUrl" in input) data.sizeChartUrl = input.sizeChartUrl ?? null;
   if (input.unitCost !== undefined) data.unitCost = input.unitCost;
@@ -205,7 +208,15 @@ export async function updateProduct(id: string, input: UpdateProductBody) {
 
   const variantInputs = input.variants;
   try {
-    await prisma.$transaction(async (tx) => {
+    await transaction(async (tx) => {
+      const currentProduct = await tx.product.findUniqueOrThrow({ where:{id} });
+      if (input.expectedUpdatedAt && currentProduct.updatedAt.toISOString() !== input.expectedUpdatedAt) throw conflict('Товар изменился. Откройте карточку заново, чтобы сохранить актуальные остатки.');
+      if (input.sizes?.length && !input.expectedUpdatedAt) throw conflict('Для изменения остатков обновите карточку');
+      if (variantInputs) {
+        const ids = variantInputs.flatMap(v => v.id ? [v.id] : []);
+        if (ids.length !== new Set(ids).size || await tx.productVariant.count({where:{productId:id,id:{in:ids}}}) !== ids.length) throw badRequest('Неверные варианты товара');
+        if (variantInputs.some(v => v.id && v.sizes.length) && !input.expectedUpdatedAt) throw conflict('Для изменения остатков обновите карточку');
+      }
       await tx.product.update({ where: { id }, data });
       if (input.sizes) {
         for (const size of input.sizes) {
@@ -241,10 +252,9 @@ export async function updateProduct(id: string, input: UpdateProductBody) {
               data: {
                 name: variant.name,
                 sku: variant.sku,
-                colorHex: variant.colorHex ?? null,
+                ...(variant.colorHex !== undefined ? { colorHex: variant.colorHex } : {}),
                 price: variant.price ?? null,
-                imageUrl: imageCols.imageUrl,
-                imagesJson: imageCols.imagesJson,
+                ...(variant.images !== undefined ? { imageUrl: imageCols.imageUrl, imagesJson: imageCols.imagesJson } : {}),
                 position: i,
                 isDefault: i === 0,
               },
@@ -417,7 +427,7 @@ export async function duplicateProduct(id: string) {
 
 /** Изменяет остаток по размеру на delta. Результат не может быть отрицательным. */
 export async function adjustStock(id: string, label: string, delta: number, variantId?: string) {
-  await prisma.$transaction(async (tx) => {
+  await transaction(async (tx) => {
     const product = await tx.product.findUnique({ where: { id } });
     if (!product) throw notFound("Товар не найден");
 
@@ -430,10 +440,11 @@ export async function adjustStock(id: string, label: string, delta: number, vari
         })
       )?.id;
     if (!targetVariantId) throw notFound("Вариант товара не найден");
-    const size = await tx.productVariantSize.findUnique({
-      where: { variantId_label: { variantId: targetVariantId, label } },
-    });
+    const owned = await tx.productVariant.findFirst({ where:{ id:targetVariantId, productId:id } });
+    if (!owned) throw notFound('Вариант товара не найден');
+    const size = await tx.productVariantSize.findUnique({ where: { variantId_label: { variantId: targetVariantId, label } } });
 
+    await tx.product.update({where:{id},data:{updatedAt:new Date()}});
     const current = size?.stock ?? 0;
     const next = current + delta;
     if (next < 0) {
@@ -474,7 +485,8 @@ export async function restoreProduct(id: string) {
 
 export async function permanentlyDeleteProduct(id: string) {
   const usedInOrders = await prisma.orderItem.count({ where: { productId: id } });
-  if (usedInOrders > 0) {
+  const usedInSales = await prisma.manualSale.count({where:{productId:id}});
+  if (usedInOrders > 0 || usedInSales > 0) {
     throw conflict("Товар участвовал в заказах и не может быть удалён окончательно.");
   }
   await prisma.product.delete({ where: { id } });

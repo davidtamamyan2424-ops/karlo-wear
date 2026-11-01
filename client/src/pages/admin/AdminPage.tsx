@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
+import { apiRequest } from '../../api/client';
 import { ru } from "../../i18n/ru";
 import { adminCheckSession } from "../../api/endpoints";
 import { loadPeriodState, savePeriodState, type PeriodState } from "../../lib/period";
@@ -29,7 +30,11 @@ type Tab =
   | "accounts";
 
 export default function AdminPage() {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
+  const [token, setToken] = useState<string | null>(null);
+  useEffect(() => {
+    try { localStorage.removeItem(TOKEN_KEY); } catch { /* optional storage */ }
+    void adminCheckSession('').then(() => setToken('session')).catch(() => {});
+  }, []);
   const [input, setInput] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
@@ -47,8 +52,8 @@ export default function AdminPage() {
     setSigningIn(true);
     try {
       await adminCheckSession(input.trim());
-      localStorage.setItem(TOKEN_KEY, input.trim());
-      setToken(input.trim());
+      setInput('');
+      setToken('session');
     } catch {
       setLoginError(ru.admin.signInError);
     } finally {
@@ -56,8 +61,8 @@ export default function AdminPage() {
     }
   };
 
-  const signOut = () => {
-    localStorage.removeItem(TOKEN_KEY);
+  const signOut = async () => {
+    await apiRequest('/admin/logout', {method:'POST'});
     setToken(null);
     setInput("");
   };

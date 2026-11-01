@@ -8,6 +8,7 @@ import MetricCard from "../../components/admin/MetricCard";
 import DateRangeSelector from "../../components/admin/DateRangeSelector";
 import BarChart from "../../components/admin/BarChart";
 import { MONTH_NAMES } from "../../constants/finance";
+import { apiRequest } from '../../api/client';
 
 interface Props {
   token: string;
@@ -24,8 +25,10 @@ export default function AdminDashboard({ token, period, onPeriodChange }: Props)
   const t = ru.admin.crm;
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [system,setSystem]=useState<{unknownCosts:number;estimatedCosts:number;pendingNotifications:number;failedNotifications:number}|null>(null);
 
   useEffect(() => {
+    void apiRequest<typeof system>('/admin/system',{adminToken:token}).then(setSystem).catch(()=>{});
     adminFetchDashboard(token, period)
       .then(setData)
       .catch(() => setError(ru.common.error));
@@ -54,6 +57,8 @@ export default function AdminDashboard({ token, period, onPeriodChange }: Props)
   return (
     <div className="space-y-5">
       <DateRangeSelector value={period} onChange={onPeriodChange} />
+      {system && (system.unknownCosts>0 || system.estimatedCosts>0) && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Для {system.unknownCosts} товаров не задана себестоимость; {system.estimatedCosts} позиций заказов имеют оценочную себестоимость. Проверяйте прибыль с учётом этих данных. Старые даты оплаты также могут быть оценочными.</p>}
+      {system && system.failedNotifications>0 && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-800">Не доставлено уведомлений: {system.failedNotifications}. Заказы сохранены — проверьте их в админке и настройки Telegram.</p>}
 
       <div className="grid grid-cols-2 gap-3">
         <MetricCard label={t.businessBalance} value={formatPrice(data.businessBalance)} large />

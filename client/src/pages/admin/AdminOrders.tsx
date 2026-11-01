@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { ru } from "../../i18n/ru";
 import { formatPrice, formatPhone } from "../../lib/format";
 import {
@@ -18,8 +18,8 @@ import {
   adminSetOrderStatus,
   type OrderListFilter,
 } from "../../api/endpoints";
-import { fileUrl } from "../../api/client";
-import { openLink } from "../../telegram/webapp";
+import { apiRequest, downloadProtectedFile } from "../../api/client";
+
 import DateRangeSelector from "../../components/admin/DateRangeSelector";
 
 const STATUS_FILTERS: OrderStatus[] = [
@@ -97,28 +97,45 @@ export default function AdminOrders({ token, period, onPeriodChange }: Props) {
   const [statusGroup, setStatusGroup] = useState<OrderListFilter["statusGroup"]>();
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [offset,setOffset] = useState(0);
+  const [hasMore,setHasMore] = useState(false);
+  const generation = useRef(0);
+  const queryKey = JSON.stringify([period,statusGroup,filter]);
+  const previousQuery = useRef(queryKey);
 
   const listFilter: OrderListFilter = {
+    limit: 100,
+    offset,
     period,
     ...(statusGroup ? { statusGroup } : filter ? { status: filter } : {}),
   };
 
   const load = useCallback(() => {
+    const request = ++generation.current;
     setError(null);
     Promise.all([
       adminFetchOrders(token, listFilter),
       adminFetchOrderStats(token, period),
     ])
       .then(([orderList, orderStats]) => {
-        setOrders(orderList);
+        if (request !== generation.current) return;
+        setHasMore(orderList.length === 100);
+        setOrders(previous => offset ? [...new Map([...(previous ?? []),...orderList].map(order=>[order.id,order])).values()] : orderList);
         setStats(orderStats);
       })
       .catch(() => setError(ru.common.error));
-  }, [token, period, statusGroup, filter]);
+  }, [token, period, statusGroup, filter, offset]);
 
   useEffect(() => {
+    if(previousQuery.current !== queryKey) {
+      previousQuery.current = queryKey;
+      generation.current++;
+      setOrders(null);
+      if(offset) { setOffset(0); return; }
+    }
     load();
-  }, [load]);
+    return () => { generation.current++; };
+  }, [load,queryKey,offset]);
 
   const selectStatCard = (key: StatCardKey) => {
     setFilter("");
@@ -297,7 +314,7 @@ export default function AdminOrders({ token, period, onPeriodChange }: Props) {
               {order.paymentProofs.length > 0 ? (
                 <button
                   type="button"
-                  onClick={() => openLink(fileUrl(order.paymentProofs[0].fileUrl))}
+                  onClick={() => void downloadProtectedFile(order.paymentProofs[0].fileUrl).catch(() => setError("Не удалось загрузить чек"))}
                   className="press inline-flex items-center gap-1.5 font-medium text-tg-link underline"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -310,6 +327,16 @@ export default function AdminOrders({ token, period, onPeriodChange }: Props) {
               )}
             </div>
 
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" className="rounded-lg border px-3 py-1.5 text-xs" onClick={async () => {
+                try { const result = await apiRequest<{path:string}>('/admin/orders/' + order.id + '/access-link', {method:'POST', adminToken:token}); await navigator.clipboard.writeText(location.origin + result.path); setError('Ссылка скопирована. Передайте её только покупателю: предыдущая ссылка доступа заменена.'); }
+                catch { setError('Не удалось скопировать ссылку'); }
+              }}>Ссылка покупателю</button>
+              {order.status === 'CANCELLED' && order.paidAt && !order.refundedAt && <button type="button" className="rounded-lg border px-3 py-1.5 text-xs" onClick={async () => {
+                if (!window.confirm('Подтвердить, что полная сумма уже возвращена покупателю?')) return;
+                try { await apiRequest('/admin/orders/' + order.id + '/refund', {method:'POST',adminToken:token}); load(); } catch { setError('Не удалось подтвердить возврат'); }
+              }}>Деньги возвращены</button>}
+            </div>
             {nextActions(order.status).length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {nextActions(order.status).map((action) => (
@@ -328,6 +355,7 @@ export default function AdminOrders({ token, period, onPeriodChange }: Props) {
           </li>
         ))}
       </ul>
+      {hasMore && <button type="button" className="rounded-lg border px-4 py-2 text-sm" onClick={()=>setOffset(value=>value+100)}>Показать ещё</button>}
     </div>
   );
 }

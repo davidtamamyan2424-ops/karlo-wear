@@ -1,3 +1,4 @@
+import { transaction } from '../lib/transaction.js';
 import { prisma } from "../lib/prisma.js";
 import { badRequest, notFound } from "../lib/errors.js";
 import type { Prisma } from "@prisma/client";
@@ -41,7 +42,7 @@ export async function createManualSale(input: ManualSaleInput) {
     throw badRequest("Укажите количество");
   }
 
-  return prisma.$transaction(async (tx) => {
+  return transaction(async (tx) => {
     const size = await resolveVariantSize(tx, input);
     await decrementVariantStock(tx, size.id, input.quantity);
 
@@ -71,7 +72,7 @@ export async function updateManualSale(id: string, input: ManualSaleInput) {
     throw badRequest("Укажите количество");
   }
 
-  return prisma.$transaction(async (tx) => {
+  return transaction(async (tx) => {
     const existing = await tx.manualSale.findUnique({ where: { id } });
     if (!existing) throw notFound("Продажа не найдена");
 
@@ -80,7 +81,7 @@ export async function updateManualSale(id: string, input: ManualSaleInput) {
     await incrementVariantStock(tx, existing.productVariantSizeId, existing.quantity);
     await decrementVariantStock(tx, size.id, input.quantity);
 
-    const unitCost = productUnitCost(size.variant.product);
+    const unitCost = existing.productId === input.productId ? existing.unitCostSnapshot : productUnitCost(size.variant.product);
     return tx.manualSale.update({
       where: { id },
       data: {
@@ -103,7 +104,7 @@ export async function updateManualSale(id: string, input: ManualSaleInput) {
 }
 
 export async function deleteManualSale(id: string) {
-  return prisma.$transaction(async (tx) => {
+  return transaction(async (tx) => {
     const existing = await tx.manualSale.findUnique({ where: { id } });
     if (!existing) throw notFound("Продажа не найдена");
 

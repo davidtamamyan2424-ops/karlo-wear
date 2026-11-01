@@ -53,6 +53,7 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
     product ? String(Math.round((product.unitCost ?? 0) / 100)) : "0",
   );
   const [badge, setBadge] = useState<string>(product?.badge ?? "");
+  const [category, setCategory] = useState(product?.category ?? "TSHIRT");
   const [isActive, setIsActive] = useState(product?.isActive ?? true);
   const makeStock = (sizes: { label: string; stock: number }[] = []): Record<Size, number> => {
     const base: Record<Size, number> = { S: 0, M: 0, L: 0, XL: 0 };
@@ -226,12 +227,14 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
     setError(null);
 
     const payload: ProductPayload = {
+      expectedUpdatedAt: product?.updatedAt,
       name: name.trim(),
       description: description.trim() || null,
       price: priceKopecks,
       unitCost: Math.round(Number(unitCostRub || 0) * 100),
       composition: composition.trim() || null,
       badge: badge ? (badge as ProductBadge) : null,
+      category: category as "TSHIRT" | "HOODIE" | "PANTS",
       sizeChartUrl,
       isActive,
       variants: variants.map((variant) => ({
@@ -240,7 +243,7 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
         sku: variant.sku.trim(),
         price: variant.priceRub.trim() ? Math.round(Number(variant.priceRub) * 100) : null,
         images: variant.images,
-        sizes: SIZES.map((label) => ({ label, stock: variant.stock[label] })),
+        sizes: variant.id ? [] : SIZES.map((label) => ({ label, stock: variant.stock[label] })),
       })),
     };
 
@@ -302,6 +305,14 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
           />
         </label>
 
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium">Категория · унисекс</span>
+          <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
+            <option value="TSHIRT">Футболки</option>
+            <option value="HOODIE">Худи</option>
+            <option value="PANTS">Брюки</option>
+          </select>
+        </label>
         <label className="block">
           <span className="mb-1 block text-xs font-medium">{t.composition}</span>
           <input value={composition} onChange={(e) => setComposition(e.target.value)} placeholder={t.compositionPlaceholder} className={inputCls} />
@@ -583,6 +594,7 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
                   inputMode="numeric"
                   min={0}
                   value={activeVariant.stock[label]}
+                  disabled={Boolean(activeVariant.id)}
                   onChange={(e) =>
                     setVariants((prev) =>
                       prev.map((variant, idx) =>

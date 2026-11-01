@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
+sharp.block({ operation: ['VipsForeignLoadSvg', 'VipsForeignLoadSvgBuffer', 'VipsForeignLoadPdf', 'VipsForeignLoadPdfBuffer', 'VipsForeignLoadHeif', 'VipsForeignLoadHeifBuffer'] });
 import { ALLOWED_IMAGE_EXT } from "../constants.js";
 import { UPLOADS_DIR, UPLOADS_URL_PREFIX } from "./uploads.js";
 
@@ -57,7 +58,10 @@ function normalizeExt(ext: string): string {
 }
 
 async function encodeWebp(input: Buffer, width: number, quality: number): Promise<Buffer> {
-  return sharp(input)
+  const image = sharp(input, { limitInputPixels: 40_000_000 });
+  const metadata = await image.metadata();
+  if (!['jpeg', 'png', 'webp'].includes(metadata.format ?? '')) throw new Error('Недопустимый формат изображения');
+  return image
     .rotate()
     .resize({
       width,
@@ -152,16 +156,16 @@ export async function ensureThumbForFull(fullUrl: string): Promise<string | null
   const thumbPath = path.join(UPLOADS_DIR, thumbName);
   const base = baseFromOptimizedFull(fullName);
 
-  if (base && (await findOriginalPathForBase(base))) {
-    await regenerateVariantsForBase(base);
-    return `${UPLOADS_URL_PREFIX}/${thumbName}`;
-  }
-
   try {
     await fs.access(thumbPath);
     return `${UPLOADS_URL_PREFIX}/${thumbName}`;
   } catch {
     /* generate from full (legacy без оригинала) */
+  }
+
+  if (base && (await findOriginalPathForBase(base))) {
+    await regenerateVariantsForBase(base);
+    return `${UPLOADS_URL_PREFIX}/${thumbName}`;
   }
 
   const fullPath = path.join(UPLOADS_DIR, fullName);

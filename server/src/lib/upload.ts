@@ -9,6 +9,9 @@ import {
   ALLOWED_PROOF_MIME,
 } from "../constants.js";
 import { UPLOADS_DIR } from "./uploads.js";
+import { RECEIPTS_DIR } from './uploads.js';
+import { readFile, unlink } from 'node:fs/promises';
+import { fileTypeFromBuffer } from 'file-type';
 import { badRequest } from "./errors.js";
 
 const storage = multer.diskStorage({
@@ -23,8 +26,11 @@ const storage = multer.diskStorage({
 const RECEIPT_MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 МБ
 
 export const uploadReceipt = multer({
-  storage,
-  limits: { fileSize: RECEIPT_MAX_FILE_SIZE },
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, RECEIPTS_DIR),
+    filename: (_req, file, cb) => cb(null, crypto.randomBytes(24).toString('hex') + path.extname(file.originalname).toLowerCase()),
+  }),
+  limits: { fileSize: RECEIPT_MAX_FILE_SIZE, files: 1, fields: 0, parts: 1, fieldNameSize: 100 },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     const mimeOk = (ALLOWED_PROOF_MIME as readonly string[]).includes(file.mimetype);
@@ -65,13 +71,22 @@ function imageFileFilter(
 
 export const uploadProductImages = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 МБ на файл
+  limits: { fileSize: 10 * 1024 * 1024, files: 20, fields: 0, parts: 20 },
   fileFilter: imageFileFilter,
 });
 
 /** Одно изображение размерной сетки. */
 export const uploadSizeChart = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024, files: 1, fields: 0, parts: 1 },
   fileFilter: imageFileFilter,
 });
+
+export async function validateFileContent(file: Express.Multer.File, receipt = false): Promise<void> {
+  const type = await fileTypeFromBuffer(await readFile(file.path));
+  const allowed = receipt ? ['image/jpeg', 'image/png', 'application/pdf'] : ['image/jpeg', 'image/png', 'image/webp'];
+  if (!type || !allowed.includes(type.mime)) {
+    await unlink(file.path).catch(() => {});
+    throw badRequest('Содержимое файла не соответствует разрешённому формату');
+  }
+}

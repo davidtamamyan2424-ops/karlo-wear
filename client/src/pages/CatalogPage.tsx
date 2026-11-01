@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { fetchProducts } from "../api/endpoints";
 import { ru } from "../i18n/ru";
 import ProductCard from "../components/ProductCard";
@@ -18,6 +19,9 @@ function Skeleton() {
 export default function CatalogPage() {
   const [products, setProducts] = useState<Awaited<ReturnType<typeof fetchProducts>> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const category = searchParams.get("category") ?? "ALL";
+  const setCategory = (value: string) => setSearchParams(value === "ALL" ? {} : { category: value });
 
   useEffect(() => {
     fetchProducts()
@@ -29,6 +33,8 @@ export default function CatalogPage() {
     () => (products ? expandCatalog(products) : []),
     [products],
   );
+
+  const filteredItems = useMemo(() => category === "ALL" ? catalogItems : catalogItems.filter((item) => item.product.category === category), [catalogItems, category]);
 
   const multiColorProducts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -44,9 +50,17 @@ export default function CatalogPage() {
         <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-ink">
           {ru.catalog.title}
         </h1>
-        <p className="mt-1 text-sm text-muted">Новая коллекция</p>
+        <p className="mt-1 text-sm text-muted">Унисекс · свободный силуэт</p>
       </header>
 
+      <div className="mb-5 flex flex-wrap gap-2" aria-label="Категории каталога">
+        {([["ALL", "Все"], ["TSHIRT", "Футболки"], ["HOODIE", "Худи"], ["PANTS", "Брюки"]] as const).map(([value, label]) => (
+          <button key={value} type="button" aria-pressed={category === value} onClick={() => setCategory(value)}
+            className={`rounded-full border px-4 py-2 text-sm ${category === value ? "border-ink bg-ink text-white" : "border-line bg-paper text-ink"}`}>
+            {label}
+          </button>
+        ))}
+      </div>
       <PromoCarousel />
 
       {error && <p className="py-8 text-center text-sm text-red-600">{error}</p>}
@@ -59,13 +73,13 @@ export default function CatalogPage() {
         </div>
       )}
 
-      {products && catalogItems.length === 0 && (
+      {products && filteredItems.length === 0 && (
         <p className="py-8 text-center text-sm text-muted">{ru.catalog.empty}</p>
       )}
 
-      {catalogItems.length > 0 && (
+      {filteredItems.length > 0 && (
         <div className="grid grid-cols-2 gap-x-3 gap-y-7">
-          {catalogItems.map((item, i) => (
+          {filteredItems.map((item, i) => (
             <div
               key={item.key}
               className="animate-fade-up"

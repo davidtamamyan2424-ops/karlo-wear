@@ -1,37 +1,35 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { calcCartPricing, calcSecondItemDiscount } from "../lib/promotions.js";
+import { calcCartPricing } from "./promotions.js";
 
-describe("calcSecondItemDiscount", () => {
-  it("returns 0 for a single item", () => {
-    assert.equal(calcSecondItemDiscount([380_000]), 0);
+describe("bundle pricing", () => {
+  it("does not discount two t-shirts or unrelated items", () => {
+    assert.equal(calcCartPricing([{ unitPrice: 380_000, quantity: 2, category: "TSHIRT" }]).discount, 0);
   });
-
-  it("discounts 10% on the cheaper of two equal items", () => {
-    assert.equal(calcSecondItemDiscount([380_000, 380_000]), 38_000);
+  it("discounts a hoodie and pants together", () => {
+    const p = calcCartPricing([{ unitPrice: 650_000, quantity: 1, category: "HOODIE" }, { unitPrice: 450_000, quantity: 1, category: "PANTS" }]);
+    assert.equal(p.discount, 110_000);
+    assert.equal(p.total, 990_000);
+    assert.equal(p.freeDeliveryRemaining, 210_000);
   });
-
-  it("discounts cheaper items first with mixed prices", () => {
-    const discount = calcSecondItemDiscount([500_000, 400_000, 300_000, 200_000]);
-    assert.equal(discount, Math.round(200_000 * 0.1) + Math.round(300_000 * 0.1));
-  });
-});
-
-describe("calcCartPricing", () => {
-  it("checks free delivery after discount is applied", () => {
-    const pricing = calcCartPricing([
-      { unitPrice: 380_000, quantity: 2 },
+  it("discounts only matched sets, choosing highest-priced eligible units", () => {
+    const p = calcCartPricing([
+      { unitPrice: 650_000, quantity: 2, category: "HOODIE" },
+      { unitPrice: 450_000, quantity: 1, category: "PANTS" },
+      { unitPrice: 380_000, quantity: 1, category: "TSHIRT" },
     ]);
-    assert.equal(pricing.subtotal, 760_000);
-    assert.equal(pricing.discount, 38_000);
-    assert.equal(pricing.total, 722_000);
-    assert.equal(pricing.qualifiesFreeDelivery, false);
-    assert.equal(pricing.freeDeliveryRemaining, 478_000);
+    assert.equal(p.discount, 110_000);
   });
-
-  it("tracks remaining amount until free delivery", () => {
-    const pricing = calcCartPricing([{ unitPrice: 380_000, quantity: 1 }]);
-    assert.equal(pricing.qualifiesFreeDelivery, false);
-    assert.equal(pricing.freeDeliveryRemaining, 820_000);
+  it("discounts multiple sets and preserves free shipping threshold", () => {
+    const p = calcCartPricing([
+      { unitPrice: 650_000, quantity: 2, category: "HOODIE" },
+      { unitPrice: 450_000, quantity: 2, category: "PANTS" },
+    ]);
+    assert.equal(p.discount, 220_000);
+    assert.equal(p.total, 1_980_000);
+    assert.equal(p.qualifiesFreeDelivery, true);
+  });
+  it("does not discount unclassified legacy products", () => {
+    assert.equal(calcCartPricing([{ unitPrice: 650_000, quantity: 1 }, { unitPrice: 450_000, quantity: 1 }]).discount, 0);
   });
 });
