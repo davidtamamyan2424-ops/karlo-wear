@@ -90,7 +90,7 @@ export function serializeProduct(product: ProductWithRelations, options?: { incl
     sizes,
     variants,
     defaultVariantId: defaultVariant?.id ?? null,
-    totalStock: sizes.reduce((sum, s) => sum + s.stock, 0),
+    totalStock: variants.reduce((sum, variant) => sum + variant.totalStock, 0),
   };
   if (options?.includeCosts) {
     return {
