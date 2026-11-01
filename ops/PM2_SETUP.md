@@ -1,5 +1,12 @@
 # KARLO WEAR: PM2 auto-start and health check (Ubuntu VPS)
 
+> Текущий production использует `karlo-wear-api.service` и
+> `/srv/karlo-wear/current/server`. Автозапуск уже настроен через systemd.
+> Инструкции PM2 ниже относятся к прежней установке `/root/karlo-wear`.
+> Не запускайте второй API через PM2 одновременно с действующей службой.
+> Проверить текущую установку: `systemctl status karlo-wear-api.service`,
+> `systemctl is-enabled karlo-wear-api.service`, `bash ops/check-api.sh`.
+
 The repository contains the PM2 process definition, but **adding these files does not configure the VPS**. Follow this runbook once on the live server after reviewing it. It assumes the existing deployment is at `/root/karlo-wear`, the API uses port 4000, and PM2 runs as root.
 
 ## Connect
