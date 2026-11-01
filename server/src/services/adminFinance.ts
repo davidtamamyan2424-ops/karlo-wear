@@ -2,7 +2,6 @@ import { prisma } from "../lib/prisma.js";
 import {
   OWNER_SALARY_RATE,
   OWNER_SALARY_THRESHOLD,
-  SALE_STATUSES,
   type SaleCategory,
 } from "../constants/finance.js";
 import { parsePeriodQuery, type PeriodQueryInput } from "../lib/period.js";
@@ -55,26 +54,33 @@ export async function getWarehouseStock() {
   }));
 }
 
-async function loadFinanceData() {
+async function loadFinanceData(filter: PeriodFilter = {}) {
   const [orders, manualSales, expenses] = await Promise.all([
     prisma.order.findMany({
-      where: { status: { in: [...SALE_STATUSES] } },
+      where: { paidAt: { not:null }, ...(filter.from || filter.to ? { OR:[{paidAt:{gte:filter.from,lte:filter.to}}, {refundedAt:{gte:filter.from,lte:filter.to,not:null}}] } : {}) },
       include: { items: { include: { product: true } } },
     }),
-    prisma.manualSale.findMany(),
-    prisma.expense.findMany(),
+    prisma.manualSale.findMany({where:{soldAt:{gte:filter.from,lte:filter.to}}}),
+    prisma.expense.findMany({where:{date:{gte:filter.from,lte:filter.to}}}),
   ]);
-  return { orders, manualSales, expenses };
+  // Represent confirmed refunds as negative events; a cancelled status alone is not money movement.
+  const events = orders.flatMap(order => {
+    const paid = { ...order, createdAt:order.paidAt!, totalAmount:order.totalAmount, eventSign:1 };
+    const refund = order.refundedAt ? [{ ...order, createdAt:order.refundedAt, totalAmount:-order.refundAmount, eventSign:-1,
+      items:order.items.map(item => ({...item, quantity:-item.quantity})) }] : [];
+    return [paid, ...refund].filter(event => inPeriod(event.createdAt,filter));
+  });
+  return { orders:events, manualSales, expenses };
 }
 
 function orderCogs(
   items: {
     quantity: number;
-    product: { unitCost: number };
+    unitCostSnapshot: number;
   }[],
 ): number {
   return items.reduce(
-    (sum, item) => sum + item.quantity * productUnitCost(item.product),
+    (sum, item) => sum + item.quantity * item.unitCostSnapshot,
     0,
   );
 }
@@ -150,13 +156,13 @@ function finalizeMetrics(m: PeriodMetrics, orderRevenue = 0): PeriodMetrics {
 }
 
 export async function computePeriodMetrics(filter: PeriodFilter = {}): Promise<PeriodMetrics> {
-  const { orders, manualSales, expenses } = await loadFinanceData();
+  const { orders, manualSales, expenses } = await loadFinanceData(filter);
   const m = emptyMetrics();
   let orderRevenue = 0;
 
   for (const order of orders) {
     if (!inPeriod(order.createdAt, filter)) continue;
-    m.orderCount += 1;
+    m.orderCount += order.eventSign;
     orderRevenue += order.totalAmount;
     m.revenue += order.totalAmount;
     m.cogs += orderCogs(order.items);
@@ -230,7 +236,7 @@ function dayKey(date: Date): string {
 
 /** Разбивка метрик по дням или месяцам внутри выбранного периода. */
 export async function computeRangeBreakdown(filter: PeriodFilter) {
-  const { orders, manualSales, expenses } = await loadFinanceData();
+  const { orders, manualSales, expenses } = await loadFinanceData(filter);
   const from = filter.from ?? new Date(0);
   const to = filter.to ?? new Date();
   const daySpan =
@@ -251,7 +257,7 @@ export async function computeRangeBreakdown(filter: PeriodFilter) {
     if (!inPeriod(order.createdAt, filter)) continue;
     const key = bucketKey(order.createdAt);
     const m = touch(key);
-    m.orderCount += 1;
+    m.orderCount += order.eventSign;
     orderRevenueByKey.set(key, (orderRevenueByKey.get(key) ?? 0) + order.totalAmount);
     m.revenue += order.totalAmount;
     m.cogs += orderCogs(order.items);
@@ -313,7 +319,9 @@ export async function computeRangeBreakdown(filter: PeriodFilter) {
 }
 
 export async function computeMonthlyBreakdown(months = 12, endAt?: Date) {
-  const { orders, manualSales, expenses } = await loadFinanceData();
+  const end = endAt ?? new Date();
+  const filter = {from:new Date(end.getFullYear(),end.getMonth()-months+1,1),to:end};
+  const { orders, manualSales, expenses } = await loadFinanceData(filter);
   const buckets = new Map<string, PeriodMetrics>();
   const orderRevenueByMonth = new Map<string, number>();
 
@@ -325,7 +333,7 @@ export async function computeMonthlyBreakdown(months = 12, endAt?: Date) {
   for (const order of orders) {
     const key = monthKey(order.createdAt);
     const m = touch(key);
-    m.orderCount += 1;
+    m.orderCount += order.eventSign;
     orderRevenueByMonth.set(key, (orderRevenueByMonth.get(key) ?? 0) + order.totalAmount);
     m.revenue += order.totalAmount;
     m.cogs += orderCogs(order.items);
@@ -342,7 +350,6 @@ export async function computeMonthlyBreakdown(months = 12, endAt?: Date) {
     touch(key).otherExpenses += expense.amount;
   }
 
-  const end = endAt ?? new Date();
   const endKey = monthKey(end);
   const allKeys = [...buckets.keys()].sort();
   const endIdx = allKeys.findIndex((k) => k === endKey);
@@ -365,7 +372,7 @@ export interface ModelStats {
 }
 
 export async function computeModelRankings(filter: PeriodFilter = {}) {
-  const { orders, manualSales } = await loadFinanceData();
+  const { orders, manualSales } = await loadFinanceData(filter);
   const map = new Map<string, ModelStats>();
 
   const touch = (productId: string, model: string) => {
@@ -379,10 +386,12 @@ export async function computeModelRankings(filter: PeriodFilter = {}) {
     if (!inPeriod(order.createdAt, filter)) continue;
     for (const item of order.items) {
       const s = touch(item.productId, item.productName);
-      const cost = productUnitCost(item.product) * item.quantity;
+      const cost = item.unitCostSnapshot * item.quantity;
       s.units += item.quantity;
-      s.revenue += item.unitPrice * item.quantity;
-      s.profit += item.unitPrice * item.quantity - cost;
+      const gross = order.items.reduce((sum,line) => sum + line.unitPrice * Math.abs(line.quantity),0);
+      const revenue = gross ? Math.round(item.unitPrice * item.quantity / gross * (order.subtotalAmount - order.discountAmount)) : 0;
+      s.revenue += revenue;
+      s.profit += revenue - cost;
     }
   }
 
@@ -404,7 +413,7 @@ export async function computeModelRankings(filter: PeriodFilter = {}) {
 }
 
 export async function computeSizeAndColorRankings(filter: PeriodFilter = {}) {
-  const { orders, manualSales } = await loadFinanceData();
+  const { orders, manualSales } = await loadFinanceData(filter);
   const sizes = new Map<string, number>();
   const colors = new Map<string, number>();
 

@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma.js";
-import { SALE_STATUSES } from "../constants/finance.js";
+
 import type { PeriodFilter } from "./adminFinance.js";
 
 export type FinanceSource =
@@ -78,31 +78,31 @@ function manualSaleSource(sale: {
 async function buildAllTransactions(period: PeriodFilter): Promise<FinanceTransaction[]> {
   const [orders, manualSales, expenses] = await Promise.all([
     prisma.order.findMany({
-      include: { items: true, paymentProofs: true },
+      where:{paidAt:{not:null},...(period.from || period.to ? {OR:[{paidAt:{gte:period.from,lte:period.to}},{refundedAt:{gte:period.from,lte:period.to,not:null}}]} : {})},
       orderBy: { createdAt: "desc" },
     }),
-    prisma.manualSale.findMany({ orderBy: { soldAt: "desc" } }),
-    prisma.expense.findMany({ orderBy: { date: "desc" } }),
+    prisma.manualSale.findMany({ where:{soldAt:{gte:period.from,lte:period.to}}, orderBy: { soldAt: "desc" } }),
+    prisma.expense.findMany({ where:{date:{gte:period.from,lte:period.to}}, orderBy: { date: "desc" } }),
   ]);
 
   const items: FinanceTransaction[] = [];
 
   for (const order of orders) {
-    if ((SALE_STATUSES as readonly string[]).includes(order.status)) {
-      if (!inPeriod(order.createdAt, period)) continue;
+    if (order.paidAt && inPeriod(order.paidAt, period)) {
       items.push({
         id: `order-${order.id}`,
-        date: order.createdAt.toISOString(),
+        date: order.paidAt!.toISOString(),
         source: "WEBSITE_ORDER",
         sourceLabel: FINANCE_SOURCE_LABELS.WEBSITE_ORDER,
-        description: `Заказ #${order.orderNumber} · ${order.customerName} · ${formatDateRu(order.createdAt)}`,
+        description: `Заказ #${order.orderNumber} · ${order.customerName} · ${formatDateRu(order.paidAt!)}`,
         amount: order.totalAmount,
         operationType: "income",
         orderNumber: order.orderNumber,
         customerName: order.customerName,
       });
-    } else if (order.status === "CANCELLED" && order.paymentProofs.length > 0) {
-      const eventDate = order.updatedAt;
+    }
+    if (order.refundedAt) {
+      const eventDate = order.refundedAt;
       if (!inPeriod(eventDate, period)) continue;
       items.push({
         id: `refund-${order.id}`,
@@ -110,7 +110,7 @@ async function buildAllTransactions(period: PeriodFilter): Promise<FinanceTransa
         source: "REFUND",
         sourceLabel: FINANCE_SOURCE_LABELS.REFUND,
         description: `Возврат по заказу #${order.orderNumber}`,
-        amount: -order.totalAmount,
+        amount: -order.refundAmount,
         operationType: "expense",
         orderNumber: order.orderNumber,
         customerName: order.customerName,

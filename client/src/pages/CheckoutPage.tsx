@@ -3,9 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { ru } from "../i18n/ru";
 import { isCompleteRuPhone, normalizeRuPhone } from "../lib/phone";
 import { useCart } from "../cart/CartContext";
-import { createOrder } from "../api/endpoints";
-import { getTelegramUser } from "../telegram/webapp";
+import { createOrder, fetchProducts, recoverOrder } from "../api/endpoints";
+import { getTelegramUser, getWebApp } from "../telegram/webapp";
 import { ApiError } from "../api/client";
+import { saveOrderAccess } from '../lib/orderAccess';
 import PhoneInput from "../components/PhoneInput";
 import LegalConsentCheckbox from "../components/LegalConsentCheckbox";
 import CartPriceSummary from "../components/CartPriceSummary";
@@ -16,7 +17,7 @@ import { calcDeliveryFee } from "../lib/delivery";
 import type { PickupPointType } from "../constants";
 
 export default function CheckoutPage() {
-  const { items, pricing, deliveryMethod, setDeliveryMethod, clear } = useCart();
+  const { items, pricing, deliveryMethod, setDeliveryMethod, clear, refresh } = useCart();
   const navigate = useNavigate();
 
   const [name, setName] = useState("");
@@ -42,11 +43,16 @@ export default function CheckoutPage() {
   );
 
   useEffect(() => {
+    const fill = () => {
     const tgUser = getTelegramUser();
     if (tgUser?.username) {
       setTelegram(`@${tgUser.username}`);
       setTelegramReadOnly(true);
     }
+    };
+    fill();
+    window.addEventListener('karlo-telegram-ready', fill);
+    return () => window.removeEventListener('karlo-telegram-ready',fill);
   }, []);
 
   useEffect(() => {
@@ -116,7 +122,7 @@ export default function CheckoutPage() {
     try {
       const tgUser = getTelegramUser();
 
-      const order = await createOrder({
+      const payload = {
         customerName: name.trim(),
         phone: normalizedPhone,
         city: needsDeliveryCity ? deliveryCity.trim() : "",
@@ -143,7 +149,23 @@ export default function CheckoutPage() {
           sizeLabel: i.size,
           quantity: i.quantity,
         })),
+      };
+      const fingerprint = JSON.stringify(payload);
+      let attempt: { fingerprint:string; key:string; token:string } | null = null;
+      try { attempt = JSON.parse(sessionStorage.getItem('karlo-checkout-attempt') ?? 'null'); } catch { /* no saved attempt */ }
+      if (!attempt || attempt.fingerprint !== fingerprint) {
+        const bytes = crypto.getRandomValues(new Uint8Array(32));
+        attempt = { fingerprint, key:crypto.randomUUID(), token:Array.from(bytes, b => b.toString(16).padStart(2,'0')).join('') };
+        try { sessionStorage.setItem('karlo-checkout-attempt', JSON.stringify(attempt)); } catch { /* current attempt remains in memory */ }
+      }
+      const recovered = await recoverOrder(attempt.key,attempt.token);
+      if (!recovered && refresh(await fetchProducts())) { setSubmitError('Цены или наличие обновились. Проверьте корзину и повторите оформление.'); return; }
+      const order = recovered ?? await createOrder({ ...payload, accessToken:attempt.token, idempotencyKey:attempt.key,
+        initData:getWebApp()?.initData || undefined, legalConsent:true, legalConsentVersion:'2026-10-22',
+        expectedTotal:pricing.total + (deliveryFee ?? 0),
       });
+      saveOrderAccess(order.id, attempt.token);
+      try { sessionStorage.removeItem('karlo-checkout-attempt'); } catch { /* optional */ }
       clear();
       navigate(`/order/${order.id}`, { replace: true });
     } catch (err) {

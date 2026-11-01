@@ -1,0 +1,84 @@
+name: Check and deploy KARLO WEAR
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run prisma:generate
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:integration
+      - run: npm run build
+      - name: Package checked source
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: |
+          files=(package.json package-lock.json client/package.json client/index.html client/src client/*.json client/*.js client/*.ts server/package.json server/tsconfig.json server/src server/prisma scripts)
+          if [ -d client/public ]; then files+=(client/public); fi
+          tar -czf /tmp/karlo-source.tar.gz "${files[@]}"
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with:
+          name: karlo-source
+          path: /tmp/karlo-source.tar.gz
+          retention-days: 7
+
+  deploy:
+    needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: production
+      url: https://karlo-wear.ru
+    concurrency:
+      group: karlo-production
+      cancel-in-progress: false
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: karlo-source
+      - name: Configure SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_HOST" && test -n "$DEPLOY_USER" && test -n "$DEPLOY_KEY" && test -n "$DEPLOY_KNOWN_HOSTS"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Upload and activate release
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote="/tmp/karlo-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          target="${DEPLOY_USER}@${DEPLOY_HOST}"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$target" "mkdir -m 700 '$remote'"
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes karlo-source.tar.gz "$target:$remote/source.tar.gz"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$target" "tar -xzf '$remote/source.tar.gz' -C '$remote' && bash '$remote/scripts/deploy-release.sh' '$GITHUB_SHA'"
+      - name: Verify public site
+        run: |
+          curl --fail --silent --show-error --max-time 20 https://karlo-wear.ru/api/ready
+          curl --fail --silent --show-error --max-time 20 https://karlo-wear.ru/ > /dev/null
+      - name: Remove runner key
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519

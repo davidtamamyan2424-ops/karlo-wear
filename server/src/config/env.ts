@@ -7,6 +7,8 @@ function optional(key: string): string | undefined {
 
 export const env = {
   port: Number(process.env.PORT ?? 4000),
+  host: process.env.HOST ?? '127.0.0.1',
+  sessionSecret: optional('SESSION_SECRET'),
   nodeEnv: process.env.NODE_ENV ?? "development",
   clientOrigins: (process.env.CLIENT_ORIGIN ?? "http://localhost:5173")
     .split(",")
