@@ -15,7 +15,13 @@ import { normalizeRuPhone } from "./lib/phone.js";
 
 export const createOrderSchema = z
   .object({
-    customerName: z.string().trim().min(1, "Укажите имя"),
+    customerName: z.string().trim().min(1, "Укажите имя").max(120),
+    accessToken: z.string().regex(/^[a-f0-9]{64}$/),
+    idempotencyKey: z.string().uuid(),
+    initData: z.string().max(10000).optional(),
+    legalConsent: z.literal(true, { errorMap: () => ({ message: 'Подтвердите согласие с условиями' }) }),
+    legalConsentVersion: z.literal('2026-10-22'),
+    expectedTotal: z.number().int().min(0).max(2_000_000_000),
     phone: z
       .string()
       .trim()
@@ -60,7 +66,7 @@ export const createOrderSchema = z
           quantity: z.number().int().min(1).max(99),
         }),
       )
-      .min(1, "Добавьте товары в корзину"),
+      .min(1, "Добавьте товары в корзину").max(50),
   })
   .superRefine((data, ctx) => {
     if (!data.deliveryConfirmed) {
@@ -137,6 +143,12 @@ export const createOrderSchema = z
     }
 
     return {
+      accessToken: data.accessToken,
+      idempotencyKey: data.idempotencyKey,
+      initData: data.initData,
+      legalConsent: data.legalConsent,
+      legalConsentVersion: data.legalConsentVersion,
+      expectedTotal: data.expectedTotal,
       customerName: data.customerName,
       phone: data.phone,
       city: data.deliveryMethod === "PICKUP" ? "" : (data.city?.trim() ?? ""),
@@ -210,7 +222,7 @@ export const createProductSchema = z.object({
 
 export type CreateProductBody = z.infer<typeof createProductSchema>;
 
-export const updateProductSchema = createProductSchema.partial();
+export const updateProductSchema = createProductSchema.partial().extend({ expectedUpdatedAt: z.string().datetime().optional() });
 export type UpdateProductBody = z.infer<typeof updateProductSchema>;
 
 // Изменение остатка: delta (может быть отрицательной для прямого вычитания).

@@ -37,6 +37,7 @@ async function sendMessage(text: string): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}/bot${env.telegramBotToken}/sendMessage`, {
       method: "POST",
+      signal: AbortSignal.timeout(15000),
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: env.telegramAdminChatId,
@@ -45,10 +46,10 @@ async function sendMessage(text: string): Promise<void> {
       }),
     });
     if (!res.ok) {
-      console.error("[telegram] sendMessage failed:", res.status, await res.text());
+      throw new Error("Telegram HTTP " + res.status);
     }
   } catch (error) {
-    console.error("[telegram] sendMessage error:", error);
+    throw new Error("Не удалось доставить уведомление Telegram");
   }
 }
 
@@ -66,13 +67,14 @@ async function sendDocument(absoluteFilePath: string, caption: string): Promise<
 
     const res = await fetch(`${API_BASE}/bot${env.telegramBotToken}/sendDocument`, {
       method: "POST",
+      signal: AbortSignal.timeout(15000),
       body: form,
     });
     if (!res.ok) {
-      console.error("[telegram] sendDocument failed:", res.status, await res.text());
+      throw new Error("Telegram HTTP " + res.status);
     }
   } catch (error) {
-    console.error("[telegram] sendDocument error:", error);
+    throw new Error("Не удалось доставить уведомление Telegram");
   }
 }
 
@@ -87,6 +89,7 @@ async function sendPhoto(imageUrl: string, caption: string): Promise<void> {
     if (isRemoteUrl(imageUrl)) {
       const res = await fetch(`${API_BASE}/bot${env.telegramBotToken}/sendPhoto`, {
         method: "POST",
+      signal: AbortSignal.timeout(15000),
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: env.telegramAdminChatId,
@@ -96,7 +99,7 @@ async function sendPhoto(imageUrl: string, caption: string): Promise<void> {
         }),
       });
       if (!res.ok) {
-        console.error("[telegram] sendPhoto failed:", res.status, await res.text());
+        throw new Error("Telegram HTTP " + res.status);
       }
       return;
     }
@@ -113,13 +116,14 @@ async function sendPhoto(imageUrl: string, caption: string): Promise<void> {
 
     const res = await fetch(`${API_BASE}/bot${env.telegramBotToken}/sendPhoto`, {
       method: "POST",
+      signal: AbortSignal.timeout(15000),
       body: form,
     });
     if (!res.ok) {
-      console.error("[telegram] sendPhoto failed:", res.status, await res.text());
+      throw new Error("Telegram HTTP " + res.status);
     }
   } catch (error) {
-    console.error("[telegram] sendPhoto error:", error);
+    throw new Error("Не удалось доставить уведомление Telegram");
   }
 }
 

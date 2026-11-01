@@ -3,8 +3,6 @@ import { useParams } from "react-router-dom";
 import { ru } from "../i18n/ru";
 import { formatPrice, formatPhone } from "../lib/format";
 import {
-  DEFAULT_PAYMENT_PHONE,
-  DEFAULT_PAYMENT_RECIPIENT,
   ORDER_STATUS_LABELS,
 } from "../constants";
 import type { Order } from "../types";
@@ -27,16 +25,21 @@ export default function PaymentPage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const paymentPhoneDisplay = formatPhone(DEFAULT_PAYMENT_PHONE);
+  const paymentPhoneDisplay = order?.assignedPhoneNumber ? formatPhone(order.assignedPhoneNumber) : "—";
 
   useEffect(() => {
     if (!id) return;
-    fetchOrder(id)
+    let active = true;
+    const load = () => fetchOrder(id)
       .then((o) => {
+        if (!active) return;
         setOrder(o);
-        if (o.status === "PAYMENT_REVIEW" || o.paymentProofs.length > 0) setSuccess(true);
+        setSuccess(o.status === "PAYMENT_REVIEW");
       })
-      .catch(() => setError(ru.common.error));
+      .catch(err => { if (active) setError(err instanceof ApiError && err.status === 401 ? "Нет доступа к заказу. Откройте его на устройстве оформления или запросите ссылку у поддержки." : ru.common.error); });
+    void load();
+    const timer = setInterval(() => void load(), 15000);
+    return () => { active = false; clearInterval(timer); };
   }, [id]);
 
   if (error) {
@@ -53,7 +56,7 @@ export default function PaymentPage() {
 
   const copyPhone = async () => {
     try {
-      await navigator.clipboard.writeText(DEFAULT_PAYMENT_PHONE);
+      await navigator.clipboard.writeText(order.assignedPhoneNumber ?? "");
       hapticImpact("light");
       show(ru.payment.phoneCopied, "success");
     } catch {
@@ -69,6 +72,7 @@ export default function PaymentPage() {
       hapticNotify("error");
       return;
     }
+    if (file.size > 20 * 1024 * 1024) { setUploadError("Максимальный размер файла — 20 МБ"); return; }
     setUploading(true);
     try {
       const updated = await uploadPaymentProof(order.id, file);
@@ -111,7 +115,7 @@ export default function PaymentPage() {
               {order.assignedBankName ?? "—"}
             </p>
           </div>
-          {row(ru.payment.recipient, DEFAULT_PAYMENT_RECIPIENT)}
+          {row(ru.payment.recipient, order.assignedRecipientName ?? "—")}
           <div className="py-2">
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-muted">{ru.payment.phoneNumber}</span>
@@ -132,7 +136,8 @@ export default function PaymentPage() {
         {row(ru.payment.statusLabel, ORDER_STATUS_LABELS[order.status])}
       </div>
 
-      {success ? (
+      {order.paymentDueAt && order.status === 'AWAITING_PAYMENT' && <p className="text-sm text-muted">Оплатить до {new Date(order.paymentDueAt).toLocaleString('ru-RU')}</p>}
+      {order.status !== 'AWAITING_PAYMENT' && order.status !== 'PAYMENT_REVIEW' ? <p className="rounded-card bg-surface p-4 text-sm">{ORDER_STATUS_LABELS[order.status]}</p> : success ? (
         <div className="flex items-center gap-3 rounded-card bg-emerald-50 p-4 text-sm font-medium text-emerald-800">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
             <svg className="animate-check-pop" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">

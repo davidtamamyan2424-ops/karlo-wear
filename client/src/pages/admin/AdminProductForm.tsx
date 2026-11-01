@@ -227,6 +227,7 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
     setError(null);
 
     const payload: ProductPayload = {
+      expectedUpdatedAt: product?.updatedAt,
       name: name.trim(),
       description: description.trim() || null,
       price: priceKopecks,
@@ -242,7 +243,7 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
         sku: variant.sku.trim(),
         price: variant.priceRub.trim() ? Math.round(Number(variant.priceRub) * 100) : null,
         images: variant.images,
-        sizes: SIZES.map((label) => ({ label, stock: variant.stock[label] })),
+        sizes: variant.id ? [] : SIZES.map((label) => ({ label, stock: variant.stock[label] })),
       })),
     };
 
@@ -593,6 +594,7 @@ export default function AdminProductForm({ token, product, onClose, onSaved }: P
                   inputMode="numeric"
                   min={0}
                   value={activeVariant.stock[label]}
+                  disabled={Boolean(activeVariant.id)}
                   onChange={(e) =>
                     setVariants((prev) =>
                       prev.map((variant, idx) =>

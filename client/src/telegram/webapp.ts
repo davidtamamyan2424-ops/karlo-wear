@@ -128,6 +128,7 @@ function loadTelegramSdk(): Promise<void> {
         resolve();
         return;
       }
+      window.setTimeout(() => reject(new Error("Telegram SDK load timeout")), SCRIPT_LOAD_TIMEOUT_MS);
       existing.addEventListener("load", () => resolve(), { once: true });
       existing.addEventListener("error", () => reject(new Error("Telegram SDK load failed")), {
         once: true,
@@ -182,6 +183,7 @@ export async function initTelegram(): Promise<TelegramWebApp | null> {
   webApp.expand();
   applyThemeParams(webApp);
   webApp.onEvent("themeChanged", () => applyThemeParams(webApp));
+  window.dispatchEvent(new Event('karlo-telegram-ready'));
 
   return webApp;
 }

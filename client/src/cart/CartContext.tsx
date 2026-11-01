@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
   type ReactNode,
 } from "react";
 import type { Product } from "../types";
@@ -42,6 +43,7 @@ interface CartContextValue {
   setQuantity: (key: string, quantity: number) => void;
   removeItem: (key: string) => void;
   clear: () => void;
+  refresh: (products: Product[]) => boolean;
 }
 
 const STORAGE_KEY = "karlo-wear-cart";
@@ -62,11 +64,11 @@ function loadCart(): CartItem[] {
     // Отбрасываем старые позиции без variantId — иначе заказ уйдёт на дефолтный цвет.
     return (parsed as CartItem[]).filter(
       (i) =>
-        typeof i.productId === "string" &&
+        i && typeof i.productId === "string" &&
         typeof i.variantId === "string" &&
         i.variantId.length > 0 &&
         typeof i.size === "string" &&
-        typeof i.quantity === "number",
+        Number.isInteger(i.quantity) && i.quantity > 0 && ["S","M","L","XL"].includes(i.size) && Number.isFinite(i.price),
     );
   } catch {
     return [];
@@ -88,14 +90,32 @@ function loadDeliveryMethod(): DeliveryMethod {
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>(loadCart);
+  const itemsRef = useRef(items);
+  const commitItems = useCallback((update: (previous: CartItem[]) => CartItem[]) => {
+    const next = update(itemsRef.current);
+    itemsRef.current = next;
+    setItems(next);
+  }, []);
+  const refresh = useCallback((products: Product[]) => {
+    const next = itemsRef.current.flatMap(item => {
+      const product = products.find(p => p.id === item.productId);
+      const variant = product?.variants.find(v => v.id === item.variantId);
+      const stock = variant?.sizes.find(s => s.label === item.size)?.stock ?? 0;
+      if (!product || !variant || !stock) return [];
+      return [{ ...item, price: variant.price ?? product.price, category: product.category, maxStock: stock, quantity: Math.min(item.quantity, stock) }];
+    });
+    const changed = JSON.stringify(next) !== JSON.stringify(itemsRef.current);
+    if (changed) commitItems(() => next);
+    return changed;
+  }, [commitItems]);
   const [deliveryMethod, setDeliveryMethodState] = useState<DeliveryMethod>(loadDeliveryMethod);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); } catch { /* storage is optional */ }
   }, [items]);
 
   useEffect(() => {
-    localStorage.setItem(DELIVERY_STORAGE_KEY, deliveryMethod);
+    try { localStorage.setItem(DELIVERY_STORAGE_KEY, deliveryMethod); } catch { /* storage is optional */ }
   }, [deliveryMethod]);
 
   const setDeliveryMethod = useCallback((method: DeliveryMethod) => {
@@ -111,14 +131,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (maxStock <= 0) return false;
 
     const key = itemKey(product.id, variant.id, size);
-    let added = true;
+    if (!Number.isInteger(quantity) || quantity < 1) return false;
+    const previous = itemsRef.current.find(i => i.key === key);
+    if (previous && previous.quantity >= maxStock) return false;
 
-    setItems((prev) => {
+    commitItems((prev) => {
       const existing = prev.find((i) => i.key === key);
       if (existing) {
         const next = Math.min(existing.quantity + quantity, maxStock);
         if (next === existing.quantity) {
-          added = false; // лимит склада достигнут
           return prev;
         }
         return prev.map((i) =>
@@ -145,11 +166,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
       ];
     });
 
-    return added;
-  }, []);
+    return true;
+  }, [commitItems]);
 
   const setQuantity = useCallback<CartContextValue["setQuantity"]>((key, quantity) => {
-    setItems((prev) =>
+    commitItems((prev) =>
       prev.flatMap((i) => {
         if (i.key !== key) return [i];
         const clamped = Math.max(0, Math.min(quantity, i.maxStock));
@@ -160,10 +181,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const removeItem = useCallback<CartContextValue["removeItem"]>((key) => {
-    setItems((prev) => prev.filter((i) => i.key !== key));
+    commitItems((prev) => prev.filter((i) => i.key !== key));
   }, []);
 
-  const clear = useCallback(() => setItems([]), []);
+  const clear = useCallback(() => commitItems(() => []), [commitItems]);
 
   const value = useMemo<CartContextValue>(() => {
     const lines = items.map((i) => ({ unitPrice: i.price, quantity: i.quantity, category: i.category }));
@@ -171,6 +192,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const count = pricing.unitCount;
     return {
       items,
+      refresh,
       count,
       subtotal: pricing.subtotal,
       discount: pricing.discount,
@@ -183,7 +205,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       removeItem,
       clear,
     };
-  }, [items, deliveryMethod, setDeliveryMethod, addItem, setQuantity, removeItem, clear]);
+  }, [items, refresh, deliveryMethod, setDeliveryMethod, addItem, setQuantity, removeItem, clear]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

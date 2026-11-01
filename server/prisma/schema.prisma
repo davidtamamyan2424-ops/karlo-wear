@@ -90,6 +90,15 @@ model ProductVariantSize {
 model Order {
   id            String      @id @default(cuid())
   orderNumber   Int         @unique // человекочитаемый номер заказа (Заказ №XXX)
+  accessTokenHash String?
+  idempotencyKey String? @unique
+  requestHash String?
+  paidAt DateTime?
+  paidAtEstimated Boolean @default(false)
+  refundedAt DateTime?
+  refundAmount Int @default(0)
+  legalConsentAt DateTime?
+  legalConsentVersion String?
   // Telegram identity of the buyer
   telegramId    String?
   telegramUser  String? // Telegram username
@@ -124,6 +133,11 @@ model Order {
   paymentProofs PaymentProof[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+
+  @@index([status, paymentDueAt])
+  @@index([paidAt])
+  @@index([createdAt])
+  @@index([phone, status])
 }
 
 model PaymentAccount {
@@ -163,6 +177,8 @@ model OrderItem {
   variantSku    String?
   sizeLabel     String?
   unitPrice     Int
+  unitCostSnapshot Int @default(0)
+  costEstimated Boolean @default(false)
   quantity      Int          @default(1)
 }
 
@@ -185,6 +201,7 @@ model ManualSale {
   soldAt               DateTime           @default(now())
   saleSource           String             @default("MANUAL") // MANUAL | WEBSITE
   createdAt            DateTime           @default(now())
+  @@index([soldAt])
 }
 
 model Expense {
@@ -194,6 +211,34 @@ model Expense {
   amount    Int
   comment   String?
   createdAt DateTime @default(now())
+  @@index([date])
+}
+
+model AdminSession {
+  id String @id
+  data String
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+
+model AuditEvent {
+  id String @id @default(cuid())
+  action String
+  entityId String?
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+}
+
+model NotificationJob {
+  id String @id @default(cuid())
+  type String
+  orderId String
+  receiptId String?
+  attempts Int @default(0)
+  runAt DateTime @default(now())
+  lockedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([runAt, attempts])
 }
 
 // Глобальные финансовые настройки (одна запись с id = "default").

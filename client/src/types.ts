@@ -31,6 +31,7 @@ export interface ProductVariant {
 export type ProductBadge = "NEW" | "BESTSELLER" | "LIMITED";
 
 export interface Product {
+  updatedAt?: string;
   id: string;
   sku: string;
   name: string;
@@ -73,6 +74,8 @@ export interface PaymentProof {
 }
 
 export interface Order {
+  paidAt?: string | null;
+  refundedAt?: string | null;
   id: string;
   orderNumber: number;
   customerName: string;
@@ -107,6 +110,12 @@ export interface PaymentAccount {
 }
 
 export interface CreateOrderPayload {
+  expectedTotal: number;
+  accessToken: string;
+  idempotencyKey: string;
+  initData?: string;
+  legalConsent: true;
+  legalConsentVersion: '2026-10-22';
   customerName: string;
   phone: string;
   city: string;

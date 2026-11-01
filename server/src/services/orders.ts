@@ -1,3 +1,7 @@
+import { transaction } from '../lib/transaction.js';
+import { hashSecret, verifyTelegramIdentity, secretsEqual } from '../lib/security.js';
+import { unauthorized } from '../lib/errors.js';
+import { assertTransition, assertReceiptAllowed } from '../lib/orderPolicy.js';
 import { prisma } from "../lib/prisma.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import {
@@ -37,6 +41,12 @@ export interface CreateOrderInput {
   deliveryAddress?: string | null;
   deliveryComment?: string | null;
   deliveryConfirmed: boolean;
+  accessToken: string;
+  idempotencyKey: string;
+  initData?: string;
+  legalConsent: true;
+  legalConsentVersion: string;
+  expectedTotal: number;
   items: CreateOrderItemInput[];
 }
 
@@ -56,7 +66,18 @@ export async function createOrder(input: CreateOrderInput) {
     throw badRequest("Добавьте товары в корзину");
   }
 
-  const order = await prisma.$transaction(async (tx) => {
+  const identity = verifyTelegramIdentity(input.initData);
+  const { initData: _initData, telegramId: _untrustedId, ...request } = input;
+  const requestHash = hashSecret(JSON.stringify(request));
+  const order = await transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${input.idempotencyKey}))::text`;
+    const previous = await tx.order.findUnique({ where: { idempotencyKey: input.idempotencyKey }, include: orderInclude });
+    if (previous) {
+      if (previous.requestHash !== requestHash || !secretsEqual(previous.accessTokenHash ?? '', hashSecret(input.accessToken))) throw conflict('Повторный запрос отличается от первоначального');
+      return previous;
+    }
+    const active = await tx.order.count({ where: { phone: input.phone, status: { in: ['AWAITING_PAYMENT', 'PAYMENT_REVIEW'] } } });
+    if (active >= 3) throw conflict('У вас уже есть неоплаченные заказы. Свяжитесь с поддержкой.');
     // 1. Резервируем склад атомарно (защита от оверселла под нагрузкой).
     const lineItems: {
       productId: string;
@@ -68,6 +89,11 @@ export async function createOrder(input: CreateOrderInput) {
       variantSku: string | null;
       sizeLabel: string;
       unitPrice: number;
+<<<<<<< HEAD
+=======
+      unitCostSnapshot: number;
+      costEstimated: boolean;
+>>>>>>> origin/main
       category: string | null;
       quantity: number;
     }[] = [];
@@ -92,7 +118,7 @@ export async function createOrder(input: CreateOrderInput) {
         include: { variant: { include: { product: true } } },
       });
 
-      if (!size || !size.variant.product.isActive) {
+      if (!size || !size.variant.product.isActive || size.variant.product.archived) {
         throw notFound("Товар или выбранный цвет не найден");
       }
 
@@ -116,6 +142,11 @@ export async function createOrder(input: CreateOrderInput) {
         sizeLabel: size.label,
         unitPrice: size.variant.price ?? size.variant.product.price,
         category: size.variant.product.category,
+<<<<<<< HEAD
+=======
+        unitCostSnapshot: size.variant.product.unitCost,
+        costEstimated: size.variant.product.unitCost === 0,
+>>>>>>> origin/main
         quantity: item.quantity,
       });
     }
@@ -125,13 +156,11 @@ export async function createOrder(input: CreateOrderInput) {
     );
     const deliveryAmount =
       calcDeliveryFee(input.deliveryMethod as DeliveryMethod, pricing) ?? 0;
+    if (pricing.total + deliveryAmount !== input.expectedTotal) throw conflict('Сумма заказа изменилась. Обновите корзину перед оформлением.');
 
     // 2. Генерируем номер заказа (атомарно в транзакции).
-    const last = await tx.order.findFirst({
-      orderBy: { orderNumber: "desc" },
-      select: { orderNumber: true },
-    });
-    const orderNumber = (last?.orderNumber ?? ORDER_NUMBER_START) + 1;
+    const [number] = await tx.$queryRaw<{ nextval: bigint }[]>`SELECT nextval('order_number_seq')`;
+    const orderNumber = Number(number.nextval);
 
     // 3. Назначаем случайный активный банк — фиксируется навсегда.
     const accounts = await tx.paymentAccount.findMany({ where: { isActive: true } });
@@ -142,15 +171,20 @@ export async function createOrder(input: CreateOrderInput) {
 
     const paymentDueAt = new Date(Date.now() + PAYMENT_WINDOW_HOURS * 60 * 60 * 1000);
 
-    return tx.order.create({
+    const created = await tx.order.create({
       data: {
         orderNumber,
+        accessTokenHash: hashSecret(input.accessToken),
+        idempotencyKey: input.idempotencyKey,
+        requestHash,
+        legalConsentAt: new Date(),
+        legalConsentVersion: input.legalConsentVersion,
         customerName: input.customerName,
         phone: input.phone,
         city: input.city,
         comment: input.comment ?? null,
-        telegramUser: input.telegramUser,
-        telegramId: input.telegramId ?? null,
+        telegramUser: identity?.username ?? input.telegramUser,
+        telegramId: identity?.id ?? null,
         deliveryMethod: input.deliveryMethod,
         deliveryAddress: input.deliveryAddress ?? null,
         deliveryComment: input.deliveryComment ?? null,
@@ -166,12 +200,18 @@ export async function createOrder(input: CreateOrderInput) {
         assignedRecipientName: account.recipientName,
         assignedPhoneNumber: account.phoneNumber,
         paymentDueAt,
-        items: { create: lineItems },
+        items: { create: lineItems.map(({ category: _category, ...item }) => item) },
       },
       include: orderInclude,
     });
+    await tx.notificationJob.create({data:{type:"NEW_ORDER",orderId:created.id}});
+    return created;
   });
 
+  return order;
+}
+
+export async function notifyOrder(order: Awaited<ReturnType<typeof getOrderById>>) {
   // Уведомление администратору (вне транзакции — сбой не должен ломать заказ).
   const variantIds = order.items
     .map((i) => i.productVariantId)
@@ -200,7 +240,7 @@ export async function createOrder(input: CreateOrderInput) {
     }),
   );
 
-  void notifyNewOrder({
+  await notifyNewOrder({
     orderNumber: order.orderNumber,
     customerName: order.customerName,
     phone: order.phone,
@@ -232,73 +272,79 @@ export async function getOrderById(id: string) {
   return order;
 }
 
-/** Добавляет чек об оплате и переводит заказ в статус «Ожидает проверки оплаты». */
+export async function requireOrderAccess(id: string, token: string | undefined) {
+  if (!token || token.length > 256) throw unauthorized('Откройте заказ на устройстве, где он был оформлен, или обратитесь в поддержку');
+  const order = await prisma.order.findUnique({ where: { id } });
+  if (!order?.accessTokenHash || !secretsEqual(order.accessTokenHash, hashSecret(token))) throw unauthorized('Нет доступа к этому заказу');
+  return order;
+}
+
+export async function recoverOrder(key: string, token: string) {
+  const order = await prisma.order.findUnique({where:{idempotencyKey:key},include:orderInclude});
+  if (!order) return null;
+  if (!order.accessTokenHash || !secretsEqual(order.accessTokenHash,hashSecret(token))) throw unauthorized('Нет доступа к заказу');
+  return customerOrder(order);
+}
+
+export function customerOrder(order: Awaited<ReturnType<typeof getOrderById>>) {
+  return {
+    id: order.id, orderNumber: order.orderNumber, status: order.status,
+    totalAmount: order.totalAmount, subtotalAmount: order.subtotalAmount, discountAmount: order.discountAmount,
+    deliveryAmount: order.deliveryAmount, currency: order.currency,
+    assignedBankName: order.assignedBankName, assignedRecipientName: order.assignedRecipientName,
+    assignedPhoneNumber: order.assignedPhoneNumber, paymentDueAt: order.paymentDueAt, createdAt: order.createdAt,
+    items: order.items.map(({ unitCostSnapshot: _cost, costEstimated: _estimated, ...item }) => item),
+    paymentProofs: order.paymentProofs.map(proof => ({ id: proof.id, uploadedAt: proof.uploadedAt })),
+  };
+}
+
 export async function attachPaymentProof(orderId: string, fileUrl: string) {
-  const order = await prisma.order.findUnique({ where: { id: orderId } });
-  if (!order) throw notFound("Заказ не найден");
-
-  if (order.status === "CANCELLED") {
-    throw conflict("Заказ отменён. Загрузка чека невозможна.");
-  }
-
-  const updated = await prisma.$transaction(async (tx) => {
-    await tx.paymentProof.create({ data: { orderId, fileUrl } });
-    return tx.order.update({
-      where: { id: orderId },
-      data: { status: "PAYMENT_REVIEW" },
-      include: orderInclude,
-    });
+  const updated = await transaction(async tx => {
+    const order = await tx.order.findUnique({ where: { id: orderId } });
+    if (!order) throw notFound('Заказ не найден');
+    assertReceiptAllowed(order);
+    if (await tx.paymentProof.count({ where: { orderId } }) >= 5) throw conflict('Достигнут лимит чеков. Обратитесь в поддержку.');
+    const proof = await tx.paymentProof.create({ data: { orderId, fileUrl } });
+    await tx.notificationJob.create({data:{type:"NEW_RECEIPT",orderId,receiptId:proof.id}});
+    return tx.order.update({ where: { id: orderId }, data: { status: 'PAYMENT_REVIEW' }, include: orderInclude });
   });
-
-  void notifyNewReceipt({
-    orderNumber: updated.orderNumber,
-    telegramUser: updated.telegramUser,
-    totalAmount: updated.totalAmount,
-    absoluteFilePath: resolveUploadPath(fileUrl),
-  });
-
   return updated;
 }
 
-/** Восстанавливает зарезервированный склад заказа (идемпотентно). */
-async function restoreStock(
-  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
-  orderId: string,
-) {
-  const order = await tx.order.findUnique({
-    where: { id: orderId },
-    include: { items: true },
+export async function setOrderStatus(orderId: string, status: OrderStatus) {
+  if (!isOrderStatus(status)) throw badRequest('Недопустимый статус заказа');
+  return transaction(async tx => {
+    const existing = await tx.order.findUnique({ where: { id: orderId }, include: { items: true } });
+    if (!existing) throw notFound('Заказ не найден');
+    assertTransition(existing.status as OrderStatus, status);
+    if (existing.status === status) return tx.order.findUniqueOrThrow({ where: { id: orderId }, include: orderInclude });
+    if (status === 'CANCELLED' && !existing.stockRestored) {
+      for (const item of existing.items) await restoreOrderItemStock(tx, item);
+    }
+    const updated = await tx.order.update({ where: { id: orderId }, data: {
+      status,
+      ...(status === 'CANCELLED' ? { stockRestored: true } : {}),
+      ...(status === 'PAID' ? { paidAt: new Date() } : {}),
+      ...(existing.status === 'PAYMENT_REVIEW' && status === 'AWAITING_PAYMENT' ? { paymentDueAt: new Date(Date.now() + PAYMENT_WINDOW_HOURS * 3600000) } : {}),
+    }, include: orderInclude });
+    await tx.auditEvent.create({ data: { action: 'ORDER_STATUS_' + status, entityId: orderId } });
+    return updated;
   });
-  if (!order || order.stockRestored) return;
-  if (!RESERVED_STATUSES.includes(order.status as OrderStatus)) return;
-
-  for (const item of order.items) {
-    await restoreOrderItemStock(tx, item);
-  }
-  await tx.order.update({ where: { id: orderId }, data: { stockRestored: true } });
 }
 
-/** Смена статуса заказа администратором. При отмене восстанавливает склад. */
-export async function setOrderStatus(orderId: string, status: OrderStatus) {
-  if (!isOrderStatus(status)) throw badRequest("Недопустимый статус заказа");
-
-  return prisma.$transaction(async (tx) => {
-    const existing = await tx.order.findUnique({ where: { id: orderId } });
-    if (!existing) throw notFound("Заказ не найден");
-
-    if (status === "CANCELLED") {
-      await restoreStock(tx, orderId);
-    }
-
-    return tx.order.update({
-      where: { id: orderId },
-      data: { status },
-      include: orderInclude,
-    });
+export async function confirmRefund(orderId: string) {
+  return transaction(async tx => {
+    const order = await tx.order.findUnique({ where: { id: orderId } });
+    if (!order || order.status !== 'CANCELLED' || !order.paidAt) throw conflict('Возврат доступен только для отменённого оплаченного заказа');
+    if (order.refundedAt) return order;
+    await tx.auditEvent.create({ data: { action: 'REFUND_CONFIRMED', entityId: orderId } });
+    return tx.order.update({ where: { id: orderId }, data: { refundedAt: new Date(), refundAmount: order.totalAmount } });
   });
 }
 
 export interface ListOrdersFilter {
+  limit?: number;
+  offset?: number;
   status?: OrderStatus;
   statuses?: OrderStatus[];
   from?: Date;
@@ -327,11 +373,16 @@ function orderWhere(filter: ListOrdersFilter) {
 }
 
 export async function listOrders(filter: ListOrdersFilter = {}) {
-  return prisma.order.findMany({
+  const orders = await prisma.order.findMany({
     where: orderWhere(filter),
     include: orderInclude,
     orderBy: { createdAt: "desc" },
+    take: Math.min(filter.limit ?? 100, 500),
+    skip: filter.offset ?? 0,
   });
+  return orders.map(({ accessTokenHash: _secret, requestHash: _request, idempotencyKey: _key, ...order }) => ({
+    ...order, paymentProofs: order.paymentProofs.map(proof => ({ ...proof, fileUrl: '/api/admin/receipts/' + proof.id })),
+  }));
 }
 
 export interface OrderStats {
@@ -374,28 +425,16 @@ export async function getOrderStats(filter: Pick<ListOrdersFilter, "from" | "to"
  * Возвращает количество отменённых заказов.
  */
 export async function cancelExpiredOrders(): Promise<number> {
-  const now = new Date();
-  const expired = await prisma.order.findMany({
-    where: {
-      status: "AWAITING_PAYMENT",
-      paymentDueAt: { lt: now },
-    },
-    select: { id: true },
-  });
-
+  const expired = await prisma.order.findMany({ where: { status: 'AWAITING_PAYMENT', paymentDueAt: { lt: new Date() } }, select: { id: true }, take: 100 });
   let cancelled = 0;
   for (const { id } of expired) {
-    await prisma.$transaction(async (tx) => {
-      const order = await tx.order.findUnique({ where: { id } });
-      if (!order || order.status !== "AWAITING_PAYMENT") return;
-      await restoreStock(tx, id);
-      await tx.order.update({ where: { id }, data: { status: "CANCELLED" } });
-      cancelled += 1;
+    await transaction(async tx => {
+      const order = await tx.order.findUnique({ where: { id }, include: { items: true } });
+      if (!order || order.status !== 'AWAITING_PAYMENT' || !order.paymentDueAt || order.paymentDueAt >= new Date()) return;
+      if (!order.stockRestored) for (const item of order.items) await restoreOrderItemStock(tx, item);
+      await tx.order.update({ where: { id }, data: { status: 'CANCELLED', stockRestored: true } });
+      cancelled++;
     });
-  }
-
-  if (cancelled > 0) {
-    console.log(`[cleanup] Автоматически отменено заказов: ${cancelled}`);
   }
   return cancelled;
 }

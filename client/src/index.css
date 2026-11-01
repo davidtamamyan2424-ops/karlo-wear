@@ -1,6 +1,9 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
+@layer base {
+  *, ::before, ::after { border-color: #ededec; }
+  button, [role="button"] { cursor: pointer; }
+}
 
 :root {
   color-scheme: light;

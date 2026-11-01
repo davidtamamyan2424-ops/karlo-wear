@@ -24,6 +24,7 @@ export interface RequestOptions {
   method?: string;
   body?: unknown;
   adminToken?: string;
+  orderToken?: string;
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -34,14 +35,17 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     headers["Content-Type"] = "application/json";
     body = JSON.stringify(options.body);
   }
-  if (options.adminToken) {
+  if (options.adminToken && options.adminToken !== 'session') {
     headers["x-admin-token"] = options.adminToken;
   }
+  if (options.orderToken) headers['x-order-token'] = options.orderToken;
 
   const res = await fetch(`${API_BASE}/api${path}`, {
     method: options.method ?? "GET",
     headers,
     body,
+    credentials: 'include',
+    signal: AbortSignal.timeout(30000),
   });
 
   if (!res.ok) await parseError(res);
@@ -53,14 +57,17 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 export async function apiUpload<T>(
   path: string,
   formData: FormData,
-  options: { adminToken?: string } = {},
+  options: { adminToken?: string; orderToken?: string } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {};
-  if (options.adminToken) headers["x-admin-token"] = options.adminToken;
+  if (options.adminToken && options.adminToken !== 'session') headers["x-admin-token"] = options.adminToken;
+  if (options.orderToken) headers['x-order-token'] = options.orderToken;
   const res = await fetch(`${API_BASE}/api${path}`, {
     method: "POST",
     headers,
     body: formData,
+    credentials: 'include',
+    signal: AbortSignal.timeout(120000),
   });
   if (!res.ok) await parseError(res);
   return (await res.json()) as T;
@@ -69,4 +76,13 @@ export async function apiUpload<T>(
 /** Абсолютный URL к файлу на сервере (например, к чеку). */
 export function fileUrl(url: string): string {
   return `${API_BASE}${url}`;
+}
+
+export async function downloadProtectedFile(url: string) {
+  const response = await fetch(fileUrl(url), { credentials:'include', signal:AbortSignal.timeout(30000) });
+  if (!response.ok) return parseError(response);
+  const blob = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = blob; link.download = 'chek'; link.click();
+  setTimeout(() => URL.revokeObjectURL(blob), 60000);
 }

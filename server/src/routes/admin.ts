@@ -48,10 +48,59 @@ import { listManualSales, createManualSale, updateManualSale, deleteManualSale }
 import { listExpenses, createExpense, deleteExpense } from "../services/adminExpenses.js";
 import { uploadProductImages, uploadSizeChart } from "../lib/upload.js";
 import { UPLOADS_URL_PREFIX } from "../lib/uploads.js";
+import { resolveUploadPath } from '../lib/uploads.js';
+import { validateFileContent } from '../lib/upload.js';
+import { env } from '../config/env.js';
+import { secretsEqual, hashSecret } from '../lib/security.js';
+import { randomBytes } from 'node:crypto';
+import { adminVersion } from '../middleware/session.js';
+import { loginLimit, failedAuthLimit } from '../middleware/limits.js';
+import { prisma } from '../lib/prisma.js';
+import { confirmRefund } from '../services/orders.js';
 
 export const adminRouter = Router();
 
-adminRouter.use(adminAuth);
+adminRouter.post('/login', loginLimit, asyncHandler(async (req, res) => {
+  const token = typeof req.body?.token === 'string' ? req.body.token : '';
+  if (!env.adminApiToken || !secretsEqual(token, env.adminApiToken)) { res.status(401).json({ error: 'Неверный токен доступа' }); return; }
+  await new Promise<void>((resolve, reject) => req.session.regenerate(error => error ? reject(error) : resolve()));
+  req.session.adminVersion = adminVersion();
+  await new Promise<void>((resolve, reject) => req.session.save(error => error ? reject(error) : resolve()));
+  res.json({ ok: true });
+}));
+
+adminRouter.use(failedAuthLimit,adminAuth);
+adminRouter.use((req, res, next) => {
+  if (!['GET','HEAD','OPTIONS'].includes(req.method)) res.on('finish', () => {
+    if (res.statusCode < 400) void prisma.auditEvent.create({ data: { action: req.method + ' ' + req.path.slice(0,200) } }).catch(error => console.error('[audit]', error));
+  });
+  next();
+});
+adminRouter.post('/logout', (req, res, next) => req.session.destroy(error => {
+  if (error) return next(error);
+  res.clearCookie('karlo.admin', { httpOnly:true, sameSite:'strict', secure:env.isProduction }); res.json({ ok:true });
+}));
+adminRouter.get('/receipts/:id', asyncHandler(async (req, res) => {
+  const proof = await prisma.paymentProof.findUnique({ where: { id:req.params.id } });
+  if (!proof) { res.sendStatus(404); return; }
+  res.setHeader('Cache-Control','no-store');
+  res.download(resolveUploadPath(proof.fileUrl));
+}));
+adminRouter.post('/orders/:id/refund', asyncHandler(async (req,res) => { res.json(await confirmRefund(req.params.id)); }));
+adminRouter.get('/system',asyncHandler(async (_req,res)=>{
+  const [unknownCosts,estimatedCosts,pendingNotifications,failedNotifications]=await Promise.all([
+    prisma.product.count({where:{archived:false,unitCost:0}}),
+    prisma.orderItem.count({where:{costEstimated:true}}),
+    prisma.notificationJob.count(),
+    prisma.notificationJob.count({where:{attempts:{gte:8}}}),
+  ]);
+  res.json({unknownCosts,estimatedCosts,pendingNotifications,failedNotifications});
+}));
+adminRouter.post('/orders/:id/access-link', asyncHandler(async (req,res) => {
+  const token = randomBytes(32).toString('hex');
+  await prisma.order.update({ where:{id:req.params.id}, data:{accessTokenHash:hashSecret(token)} });
+  res.json({ path: '/order/' + req.params.id + '#access=' + token });
+}));
 
 // Простая проверка токена (для формы входа в админку)
 adminRouter.get("/session", (_req, res) => {
@@ -93,6 +142,8 @@ adminRouter.get(
 
     res.json(
       await listOrders({
+        limit: Math.min(500, Math.max(1, Math.floor(Number(req.query.limit) || 100))),
+        offset: Math.max(0, Math.floor(Number(req.query.offset) || 0)),
         status,
         statuses,
         from: period.from,
@@ -232,6 +283,7 @@ adminRouter.post(
     const { ingestProductImage } = await import("../lib/imageOptimize.js");
     const urls: string[] = [];
     for (const file of files) {
+      await validateFileContent(file);
       const optimized = await ingestProductImage(file.path);
       urls.push(optimized.fullUrl);
     }
@@ -254,7 +306,10 @@ adminRouter.post(
   uploadSizeChart.single("image"),
   asyncHandler(async (req, res) => {
     if (!req.file) throw badRequest("Не выбрано изображение размерной сетки");
-    res.status(201).json({ url: `${UPLOADS_URL_PREFIX}/${req.file.filename}` });
+    await validateFileContent(req.file);
+    const { ingestProductImage } = await import('../lib/imageOptimize.js');
+    const image = await ingestProductImage(req.file.path);
+    res.status(201).json({ url: image.fullUrl });
   }),
 );
 
